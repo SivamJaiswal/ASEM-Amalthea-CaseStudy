@@ -1,0 +1,551 @@
+import "http://app4mc.eclipse.org/amalthea/3.3.0" as am
+import "edu.kit.ipd.sdq.metamodels.asem.classifiers" as asem_c
+import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
+import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
+
+// Change propagation: AMALTHEA (APP4MC 3.3.0) --> ASEM (KIT)
+// Existence rules  : E1, E2, E5, E6, E9, E10, E11, E14, E15, E16, E17
+// Property rules   : P1, P3, P5, P8, P9, P11
+// Structural rules : S5, S6
+// Correspondences are created here; AsemToAmalthea.reactions only looks them up.
+
+// NOTE — segment name must start with lowercase (Reactions DSL requirement)
+reactions: amaltheaToAsem
+in reaction to changes in am
+execute actions in asem_c
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 1 — Component ↔ Module   (Rule 1 / E1, E2, P1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E1 — Component created → create a Module with the same name
+reaction ComponentCreated {
+    after element am::Component created
+    call createModuleForComponent(affectedEObject)
+}
+
+routine createModuleForComponent(am::Component component) {
+    match {
+        require absence of asem_c::Module corresponding to component
+    }
+    create {
+        val module = new asem_c::Module
+    }
+    update {
+        module.name = component.name
+        addCorrespondenceBetween(component, module)
+    }
+}
+
+// E2 — Component deleted → delete the corresponding Module
+reaction ComponentDeleted {
+    after element am::Component deleted
+    call deleteModuleForComponent(affectedEObject)
+}
+
+routine deleteModuleForComponent(am::Component component) {
+    match {
+        val module = retrieve asem_c::Module corresponding to component
+    }
+    update {
+        removeObject(module)
+        removeCorrespondenceBetween(component, module)
+    }
+}
+
+// P1 — Component.name changed → update Module.name
+reaction ComponentRenamed {
+    after attribute replaced at am::Component[name]
+    call syncComponentNameToModule(affectedEObject)
+}
+
+routine syncComponentNameToModule(am::Component component) {
+    match {
+        val module = retrieve asem_c::Module corresponding to component
+    }
+    update {
+        module.name = component.name
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 2 — Runnable ↔ Method   (Rule 4 / E5, E6, P3)
+//
+// OCL invariants from Table 5.1 — enforced structurally at creation time:
+//   self.returnType.oclIsUndefined()   → returnType is never set
+//   self.parameters->size() = 0        → parameters list is never populated
+//
+// NOTE — S1/S2 (Runnable inserted/removed in Component.runnables) are NOT
+// implemented as separate reactions. The Reactions DSL fires ElementInserted
+// and ElementDeleted reactions for containment changes, which already cover
+// the E5/E6 reactions above. Adding separate S1/S2 reactions would cause
+// duplicate Method creation. S1/S2 are therefore satisfied by E5/E6.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E5 — Runnable created → create a void no-param Method in the parent Module
+reaction RunnableCreated {
+    after element am::Runnable created
+    call createMethodForRunnable(affectedEObject)
+}
+
+routine createMethodForRunnable(am::Runnable runnable) {
+    match {
+        require absence of asem_d::Method corresponding to runnable
+        val module = retrieve asem_c::Module corresponding to runnable.eContainer
+    }
+    create {
+        val method = new asem_d::Method
+    }
+    update {
+        method.name = runnable.name
+        // returnType intentionally null  — OCL: ret.oclIsUndefined()
+        // parameters intentionally empty — OCL: arguments->size()=0
+        module.methods += method
+        addCorrespondenceBetween(runnable, method)
+    }
+}
+
+// E6 — Runnable deleted → remove the corresponding Method
+reaction RunnableDeleted {
+    after element am::Runnable deleted
+    call deleteMethodForRunnable(affectedEObject)
+}
+
+routine deleteMethodForRunnable(am::Runnable runnable) {
+    match {
+        val method = retrieve asem_d::Method corresponding to runnable
+    }
+    update {
+        removeObject(method)
+        removeCorrespondenceBetween(runnable, method)
+    }
+}
+
+// P3 — Runnable.name changed → update Method.name
+reaction RunnableRenamed {
+    after attribute replaced at am::Runnable[name]
+    call syncRunnableNameToMethod(affectedEObject)
+}
+
+routine syncRunnableNameToMethod(am::Runnable runnable) {
+    match {
+        val method = retrieve asem_d::Method corresponding to runnable
+    }
+    update {
+        method.name = runnable.name
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3 — Label ↔ Message / Constant   (Rules 5 & 6 / E9–E11, P5, P8, P9, S5, S6)
+//
+// Label constant=false → Message   (Rule 6)
+// Label constant=true  → Constant  (Rule 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E9 — non-constant Label created → create a Message
+reaction VariableLabelCreated {
+    after element am::Label created
+        with affectedEObject.constant == false
+    call createMessageForLabel(affectedEObject)
+}
+
+routine createMessageForLabel(am::Label label) {
+    match {
+        require absence of asem_d::Message corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.eContainer
+    }
+    create {
+        val message = new asem_d::Message
+    }
+    update {
+        message.name = label.name
+        module.typedElements += message
+        addCorrespondenceBetween(label, message)
+    }
+}
+
+// E10 — constant Label created → create a Constant
+reaction ConstantLabelCreated {
+    after element am::Label created
+        with affectedEObject.constant == true
+    call createConstantForLabel(affectedEObject)
+}
+
+routine createConstantForLabel(am::Label label) {
+    match {
+        require absence of asem_d::Constant corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.eContainer
+    }
+    create {
+        val constant = new asem_d::Constant
+    }
+    update {
+        constant.name = label.name
+        module.typedElements += constant
+        addCorrespondenceBetween(label, constant)
+    }
+}
+
+// E11 — Label deleted → remove the Message or Constant counterpart
+reaction LabelDeleted {
+    after element am::Label deleted
+    call deleteLabelCorrespondence(affectedEObject)
+}
+
+routine deleteLabelCorrespondenceAsMessage(am::Label label) {
+    match {
+        val message = retrieve asem_d::Message corresponding to label
+    }
+    update {
+        removeObject(message)
+        removeCorrespondenceBetween(label, message)
+    }
+}
+
+routine deleteLabelCorrespondenceAsConstant(am::Label label) {
+    match {
+        val constant = retrieve asem_d::Constant corresponding to label
+    }
+    update {
+        removeObject(constant)
+        removeCorrespondenceBetween(label, constant)
+    }
+}
+
+routine deleteLabelCorrespondence(am::Label label) {
+    update {
+        deleteLabelCorrespondenceAsMessage(label)
+        deleteLabelCorrespondenceAsConstant(label)
+    }
+}
+
+// P5 — Label.name changed → update Message.name or Constant.name
+reaction LabelRenamed {
+    after attribute replaced at am::Label[name]
+    call syncLabelName(affectedEObject)
+}
+
+routine syncLabelNameAsMessage(am::Label label) {
+    match {
+        val message = retrieve asem_d::Message corresponding to label
+    }
+    update {
+        message.name = label.name
+    }
+}
+
+routine syncLabelNameAsConstant(am::Label label) {
+    match {
+        val constant = retrieve asem_d::Constant corresponding to label
+    }
+    update {
+        constant.name = label.name
+    }
+}
+
+routine syncLabelName(am::Label label) {
+    update {
+        syncLabelNameAsMessage(label)
+        syncLabelNameAsConstant(label)
+    }
+}
+
+// P8 — Label.constant flipped false→true: replace Message with Constant
+reaction LabelFlippedToConstant {
+    after attribute replaced at am::Label[constant]
+        with affectedEObject.constant == true
+    call swapMessageToConstant(affectedEObject)
+}
+
+routine swapMessageToConstant(am::Label label) {
+    match {
+        val message = retrieve asem_d::Message corresponding to label
+        val module  = retrieve asem_c::Module corresponding to label.eContainer
+    }
+    create {
+        val newConstant = new asem_d::Constant
+    }
+    update {
+        module.typedElements -= message
+        removeObject(message)
+        removeCorrespondenceBetween(label, message)
+        newConstant.name = label.name
+        module.typedElements += newConstant
+        addCorrespondenceBetween(label, newConstant)
+    }
+}
+
+// P9 — Label.constant flipped true→false: replace Constant with Message
+reaction LabelFlippedToVariable {
+    after attribute replaced at am::Label[constant]
+        with affectedEObject.constant == false
+    call swapConstantToMessage(affectedEObject)
+}
+
+routine swapConstantToMessage(am::Label label) {
+    match {
+        val constant = retrieve asem_d::Constant corresponding to label
+        val module   = retrieve asem_c::Module corresponding to label.eContainer
+    }
+    create {
+        val newMessage = new asem_d::Message
+    }
+    update {
+        module.typedElements -= constant
+        removeObject(constant)
+        removeCorrespondenceBetween(label, constant)
+        newMessage.name = label.name
+        module.typedElements += newMessage
+        addCorrespondenceBetween(label, newMessage)
+    }
+}
+
+// S5/S6 — Label inserted/removed in Component.labels
+// NOTE — these are already covered by E9/E10/E11 (ElementCreated/Deleted reactions).
+// Separate structural reactions for inserted/removed cannot use a `with` guard
+// because affectedEObject in that context is the container (Component), not the
+// inserted Label. Removed to avoid duplicate creation and type errors.
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 4 — BaseTypeDefinition ↔ PrimitiveType   (Rules 7–9 / E14–E16, P11)
+//
+// size = 1           → BooleanType             (Rule 7)
+// size in {8,16,32}  → Unsigned/SignedDiscrete  (Rule 8)
+// size in {32,64}    → ContinuousType           (Rule 9)
+//
+// Overlap at size=32: alias containing "float" or "double" → ContinuousType,
+// otherwise → DiscreteType.
+//
+// NOTE on DSL constraints:
+//   - Elvis operator ?: is not valid in Reactions DSL update blocks
+//   - String.valueOf is not available; use literal concatenation or intValue
+//   - Lambda exists[] with two conditions requires explicit typing
+//   - after reference replaced is not valid; use after attribute replaced
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E14 — size=1 → BooleanType
+reaction BooleanBaseTypeCreated {
+    after element am::BaseTypeDefinition created
+        with affectedEObject.size !== null
+          && affectedEObject.size.value.intValue == 1
+    call createBooleanType(affectedEObject)
+}
+
+routine createBooleanType(am::BaseTypeDefinition btd) {
+    match {
+        require absence of asem_p::BooleanType corresponding to btd
+    }
+    create {
+        val boolType = new asem_p::BooleanType
+    }
+    update {
+        boolType.name = btd.name
+        addCorrespondenceBetween(btd, boolType)
+    }
+}
+
+// E15 — size in {8,16,32}, no float/double alias → DiscreteType
+reaction DiscreteBaseTypeCreated {
+    after element am::BaseTypeDefinition created
+        with affectedEObject.size !== null
+          && (   affectedEObject.size.value.intValue == 8
+              || affectedEObject.size.value.intValue == 16
+              || affectedEObject.size.value.intValue == 32)
+          && affectedEObject.aliases.exists[alias.toLowerCase.contains("float") == false
+                                         && alias.toLowerCase.contains("double") == false]
+    call createDiscreteType(affectedEObject)
+}
+
+routine createUnsignedDiscreteType(am::BaseTypeDefinition btd) {
+    match {
+        require absence of asem_p::UnsignedDiscreteType corresponding to btd
+    }
+    create {
+        val ud = new asem_p::UnsignedDiscreteType
+    }
+    update {
+        ud.name = btd.name
+        addCorrespondenceBetween(btd, ud)
+    }
+}
+
+routine createSignedDiscreteType(am::BaseTypeDefinition btd) {
+    match {
+        require absence of asem_p::SignedDiscreteType corresponding to btd
+    }
+    create {
+        val sd = new asem_p::SignedDiscreteType
+    }
+    update {
+        sd.name = btd.name
+        addCorrespondenceBetween(btd, sd)
+    }
+}
+
+routine createDiscreteType(am::BaseTypeDefinition btd) {
+    update {
+        // alias starting with 'u' or 'U' → unsigned; everything else → signed
+        if (btd.aliases.exists[alias.startsWith("u") || alias.startsWith("U")]) {
+            createUnsignedDiscreteType(btd)
+        } else {
+            createSignedDiscreteType(btd)
+        }
+    }
+}
+
+// E16 — size in {32,64} with float/double alias → ContinuousType
+reaction ContinuousBaseTypeCreated {
+    after element am::BaseTypeDefinition created
+        with affectedEObject.size !== null
+          && (   affectedEObject.size.value.intValue == 32
+              || affectedEObject.size.value.intValue == 64)
+          && affectedEObject.aliases.exists[alias.toLowerCase.contains("float")
+                                         || alias.toLowerCase.contains("double")]
+    call createContinuousType(affectedEObject)
+}
+
+routine createContinuousType(am::BaseTypeDefinition btd) {
+    match {
+        require absence of asem_p::ContinuousType corresponding to btd
+    }
+    create {
+        val contType = new asem_p::ContinuousType
+    }
+    update {
+        contType.name = btd.name
+        addCorrespondenceBetween(btd, contType)
+    }
+}
+
+// P11 — BaseTypeDefinition.size changed → remove old primitive, create new one
+// NOTE — size is an attribute (DataSize), not a reference, so we use
+// "after attribute replaced at" — but DataSize is a contained object so
+// we listen for the size attribute of BaseTypeDefinition directly.
+// P11 — BaseTypeDefinition size changed → remove old primitive, create new one
+// NOTE — BaseTypeDefinition.size is a contained DataSize object (EReference, not EAttribute).
+// The Reactions DSL "after attribute replaced" only works on EAttribute features.
+// Navigating up from DataSize via eContainer or instanceof is also not supported in
+// update blocks. P11 therefore listens on the BaseTypeDefinition element itself
+// being replaced (deleted + created), which covers the case where a new DataSize
+// is assigned. If Benedikt requires runtime size changes, a custom Java propagation
+// spec must be used instead of the Reactions DSL for this rule.
+reaction BaseTypeDefinitionRecreated {
+    after element am::BaseTypeDefinition created
+    call replacePrimitiveTypeOnRecreation(affectedEObject)
+}
+
+routine replacePrimitiveTypeOnRecreation(am::BaseTypeDefinition btd) {
+    update {
+        // clean up any stale primitive from a previous version of this BTD
+        removeOldBooleanType(btd)
+        removeOldUnsignedDiscreteType(btd)
+        removeOldSignedDiscreteType(btd)
+        removeOldContinuousType(btd)
+        // the creation reactions (E14/E15/E16) will fire immediately after
+        // and create the correct new primitive — nothing more needed here
+    }
+}
+
+routine removeOldBooleanType(am::BaseTypeDefinition btd) {
+    match {
+        val old = retrieve asem_p::BooleanType corresponding to btd
+    }
+    update {
+        removeObject(old)
+        removeCorrespondenceBetween(btd, old)
+    }
+}
+
+routine removeOldUnsignedDiscreteType(am::BaseTypeDefinition btd) {
+    match {
+        val old = retrieve asem_p::UnsignedDiscreteType corresponding to btd
+    }
+    update {
+        removeObject(old)
+        removeCorrespondenceBetween(btd, old)
+    }
+}
+
+routine removeOldSignedDiscreteType(am::BaseTypeDefinition btd) {
+    match {
+        val old = retrieve asem_p::SignedDiscreteType corresponding to btd
+    }
+    update {
+        removeObject(old)
+        removeCorrespondenceBetween(btd, old)
+    }
+}
+
+routine removeOldContinuousType(am::BaseTypeDefinition btd) {
+    match {
+        val old = retrieve asem_p::ContinuousType corresponding to btd
+    }
+    update {
+        removeObject(old)
+        removeCorrespondenceBetween(btd, old)
+    }
+}
+
+routine replacePrimitiveType(am::BaseTypeDefinition btd) {
+    update {
+        removeOldBooleanType(btd)
+        removeOldUnsignedDiscreteType(btd)
+        removeOldSignedDiscreteType(btd)
+        removeOldContinuousType(btd)
+        // re-create based on new size — call the creation routines directly
+        // guard checks are duplicated here because the reaction guards only
+        // fire on first creation, not on size change
+        if (btd.size !== null) {
+            val sizeVal = btd.size.value.intValue
+            val hasContinuousAlias = btd.aliases.exists[
+                alias.toLowerCase.contains("float") ||
+                alias.toLowerCase.contains("double")]
+            if (sizeVal == 1) {
+                createBooleanType(btd)
+            } else if ((sizeVal == 8 || sizeVal == 16 || sizeVal == 32)
+                       && !hasContinuousAlias) {
+                createDiscreteType(btd)
+            } else if ((sizeVal == 32 || sizeVal == 64) && hasContinuousAlias) {
+                createContinuousType(btd)
+            }
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 5 — Array ↔ ComposedType   (Rule 10 / E17)
+//
+// NOTE on P12 (Array.numberElements changed):
+//   ComposedType in the provided ASEM ecore has no customProperties field
+//   and no dedicated size attribute. P12 cannot be implemented without
+//   either a size field on ComposedType or a workaround agreed with Benedikt.
+//   The P12 reaction is therefore omitted from this file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E17 — Array created → create a ComposedType
+reaction ArrayCreated {
+    after element am::Array created
+    call createComposedTypeForArray(affectedEObject)
+}
+
+routine createComposedTypeForArray(am::Array array) {
+    match {
+        require absence of asem_c::ComposedType corresponding to array
+    }
+    create {
+        val composedType = new asem_c::ComposedType
+    }
+    update {
+        // name the ComposedType after the Array itself (not the DataTypeDefinition)
+        // because eContainer access in update blocks is not supported in this DSL version
+        // Array has no name attribute in AMALTHEA — name is set from the test/caller
+        composedType.name = "ComposedType"
+        addCorrespondenceBetween(array, composedType)
+    }
+}

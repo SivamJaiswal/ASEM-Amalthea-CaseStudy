@@ -1,0 +1,218 @@
+import "http://app4mc.eclipse.org/amalthea/3.3.0" as am
+import "edu.kit.ipd.sdq.metamodels.asem.classifiers" as asem_c
+import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
+
+// Change propagation: ASEM (KIT) --> AMALTHEA (APP4MC 3.3.0)
+// Existence rules  : E3, E4, E7, E8, E12, E13
+// Property rules   : P2, P4, P6, P7
+// Structural rules : S3, S4, S7, S8
+// Correspondences are NOT created here — looked up from amaltheaToAsem.
+
+// NOTE — segment name must start with lowercase (Reactions DSL requirement)
+reactions: asemToAmalthea
+in reaction to changes in asem_c
+execute actions in am
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 1 — Module ↔ Component   (Rule 1 / E3, E4, P2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E3 — Module created → create a Component
+reaction ModuleCreated {
+    after element asem_c::Module created
+    call createComponentForModule(affectedEObject)
+}
+
+routine createComponentForModule(asem_c::Module module) {
+    match {
+        require absence of am::Component corresponding to module
+    }
+    create {
+        val component = new am::Component
+    }
+    update {
+        component.name = module.name
+        addCorrespondenceBetween(module, component)
+    }
+}
+
+// E4 — Module deleted → delete the corresponding Component
+reaction ModuleDeleted {
+    after element asem_c::Module deleted
+    call deleteComponentForModule(affectedEObject)
+}
+
+routine deleteComponentForModule(asem_c::Module module) {
+    match {
+        val component = retrieve am::Component corresponding to module
+    }
+    update {
+        removeObject(component)
+        removeCorrespondenceBetween(module, component)
+    }
+}
+
+// P2 — Module.name changed → update Component.name
+reaction ModuleRenamed {
+    after attribute replaced at asem_c::Module[name]
+    call syncModuleNameToComponent(affectedEObject)
+}
+
+routine syncModuleNameToComponent(asem_c::Module module) {
+    match {
+        val component = retrieve am::Component corresponding to module
+    }
+    update {
+        component.name = module.name
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 2 — Method ↔ Runnable   (Rule 4 / E7, E8, P4)
+//
+// Only Methods satisfying the Rule 4 OCL invariants trigger a Runnable:
+//   returnType must be null
+//   parameters list must be empty
+//
+// NOTE — S3/S4 (Method inserted/removed in Module.methods) are handled
+// by E7/E8 above since containment changes fire ElementCreated/Deleted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E7 — void no-param Method created → create a Runnable
+reaction VoidMethodCreated {
+    after element asem_d::Method created
+        with affectedEObject.returnType === null
+          && affectedEObject.parameters.empty
+    call createRunnableForMethod(affectedEObject)
+}
+
+routine createRunnableForMethod(asem_d::Method method) {
+    match {
+        require absence of am::Runnable corresponding to method
+        val component = retrieve am::Component corresponding to method.eContainer
+    }
+    create {
+        val runnable = new am::Runnable
+    }
+    update {
+        runnable.name = method.name
+        component.runnables += runnable
+        addCorrespondenceBetween(method, runnable)
+    }
+}
+
+// E8 — Method deleted → delete the corresponding Runnable
+reaction MethodDeleted {
+    after element asem_d::Method deleted
+    call deleteRunnableForMethod(affectedEObject)
+}
+
+routine deleteRunnableForMethod(asem_d::Method method) {
+    match {
+        val runnable = retrieve am::Runnable corresponding to method
+    }
+    update {
+        removeObject(runnable)
+        removeCorrespondenceBetween(method, runnable)
+    }
+}
+
+// P4 — Method.name changed → update Runnable.name
+reaction MethodRenamed {
+    after attribute replaced at asem_d::Method[name]
+    call syncMethodNameToRunnable(affectedEObject)
+}
+
+routine syncMethodNameToRunnable(asem_d::Method method) {
+    match {
+        val runnable = retrieve am::Runnable corresponding to method
+    }
+    update {
+        runnable.name = method.name
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3 — Message ↔ Label (constant=false) / Constant ↔ Label (constant=true)
+//             (Rules 5 & 6 / E12, E13, P6, P7)
+//
+// NOTE — S7/S8 (Message/Constant inserted in Module.typedElements) are
+// handled by E12/E13 above since containment changes fire ElementCreated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E12 — Message created → create a non-constant Label
+reaction MessageCreated {
+    after element asem_d::Message created
+    call createLabelForMessage(affectedEObject)
+}
+
+routine createLabelForMessage(asem_d::Message message) {
+    match {
+        require absence of am::Label corresponding to message
+        val component = retrieve am::Component corresponding to message.eContainer
+    }
+    create {
+        val label = new am::Label
+    }
+    update {
+        label.name     = message.name
+        label.constant = false
+        component.labels += label
+        addCorrespondenceBetween(message, label)
+    }
+}
+
+// E13 — Constant created → create a constant Label
+reaction ConstantCreated {
+    after element asem_d::Constant created
+    call createLabelForConstant(affectedEObject)
+}
+
+routine createLabelForConstant(asem_d::Constant constant) {
+    match {
+        require absence of am::Label corresponding to constant
+        val component = retrieve am::Component corresponding to constant.eContainer
+    }
+    create {
+        val label = new am::Label
+    }
+    update {
+        label.name     = constant.name
+        label.constant = true
+        component.labels += label
+        addCorrespondenceBetween(constant, label)
+    }
+}
+
+// P6 — Message.name changed → update Label.name
+reaction MessageRenamed {
+    after attribute replaced at asem_d::Message[name]
+    call syncMessageNameToLabel(affectedEObject)
+}
+
+routine syncMessageNameToLabel(asem_d::Message message) {
+    match {
+        val label = retrieve am::Label corresponding to message
+    }
+    update {
+        label.name = message.name
+    }
+}
+
+// P7 — Constant.name changed → update Label.name
+reaction ConstantRenamed {
+    after attribute replaced at asem_d::Constant[name]
+    call syncConstantNameToLabel(affectedEObject)
+}
+
+routine syncConstantNameToLabel(asem_d::Constant constant) {
+    match {
+        val label = retrieve am::Label corresponding to constant
+    }
+    update {
+        label.name = constant.name
+    }
+}
