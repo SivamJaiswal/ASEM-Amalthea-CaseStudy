@@ -26,8 +26,8 @@
   </eAnnotations>
   <eClassifiers xsi:type="ecore:EClass" name="Amalthea" eSuperTypes="#//BaseObject">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="version" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        changeable="false" volatile="true" transient="true" derived="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" changeable="false"
+        volatile="true" transient="true" derived="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="get" value="return &quot;3.3.0&quot;;"/>
       </eAnnotations>
@@ -130,8 +130,8 @@
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="qualifiedName" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        changeable="false" volatile="true" transient="true" derived="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" changeable="false"
+        volatile="true" transient="true" derived="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="propertyCategory" value="Read only"/>
         <details key="get" value="return &lt;%org.eclipse.app4mc.amalthea.model.AmaltheaExtensions%>.toPlainString(this.getQualifiedNameSegments(), this.getDefaultNameSeparator());"/>
@@ -161,8 +161,8 @@
       </eParameters>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="uniqueName" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        changeable="false" volatile="true" transient="true" derived="true" iD="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" changeable="false"
+        volatile="true" transient="true" derived="true" iD="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="propertyCategory" value="Read only"/>
         <details key="propertyFilterFlags" value="org.eclipse.ui.views.properties.expert"/>
@@ -254,11 +254,9 @@
     <eStructuralFeatures xsi:type="ecore:EReference" name="chunkSize" eType="#//DataSize"
         containment="true" resolveProxies="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="chunkProcessingTicks" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="transmitRatio" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="1.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="1.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="ParameterType">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -536,40 +534,35 @@
       <details key="documentation" value="Object for using the elementary datatype integer as generic parameter."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="LongObject" eSuperTypes="#//Value">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="Object for using the elementary datatype long as generic parameter."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELong"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELong" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="FloatObject" eSuperTypes="#//Value">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="Object for using the elementary datatype float as generic parameter."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EFloat"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EFloat" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="DoubleObject" eSuperTypes="#//Value">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="Object for using the elementary datatype double as generic parameter."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="BooleanObject" eSuperTypes="#//Value">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
       <details key="documentation" value="Object for using the elementary datatype boolean as generic parameter."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="NumericStatistic" abstract="true" interface="true"/>
   <eClassifiers xsi:type="ecore:EClass" name="MinAvgMaxStatistic" eSuperTypes="#//NumericStatistic">
@@ -805,8 +798,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELong"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELong" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="DiscreteValueHistogram" eSuperTypes="#//IDiscreteValueDeviation">
     <eOperations name="getLowerBound" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//ELongObject">
@@ -883,8 +875,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="mean" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="sd" unique="false" lowerBound="1"
         eType="#//PositiveDouble" defaultValueLiteral="1.0"/>
   </eClassifiers>
@@ -961,8 +952,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ContinuousValueHistogram" eSuperTypes="#//IContinuousValueDeviation">
     <eOperations name="getLowerBound" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDoubleObject">
@@ -1040,8 +1030,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="mean" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="sd" unique="false" lowerBound="1"
         eType="#//PositiveDouble" defaultValueLiteral="1.0"/>
   </eClassifiers>
@@ -1184,8 +1173,7 @@
       <details key="labelFeature" value="qualifiedName"/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="version" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        defaultValueLiteral="1.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" defaultValueLiteral="1.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="SubInterface" eSuperTypes="#//ComponentInterface">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -1238,8 +1226,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="structureType" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"
-        defaultValueLiteral=""/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString" defaultValueLiteral=""/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="subStructures" upperBound="-1"
         eType="#//ComponentStructure" containment="true" resolveProxies="false"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="memberObjects" upperBound="-1"
@@ -1666,11 +1653,9 @@
   <eClassifiers xsi:type="ecore:EClass" name="DataAge" abstract="true"/>
   <eClassifiers xsi:type="ecore:EClass" name="DataAgeCycle" eSuperTypes="#//DataAge">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="minimumCycle" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="maximumCycle" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="DataAgeTime" eSuperTypes="#//DataAge">
     <eStructuralFeatures xsi:type="ecore:EReference" name="minimumTime" eType="#//Time"
@@ -1708,8 +1693,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="metric" unique="false"
         eType="#//CPUPercentageMetric"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="limitValue" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="hardwareContext" eType="#//ProcessingUnit"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="FrequencyRequirementLimit" eSuperTypes="#//RequirementLimit">
@@ -1722,15 +1706,13 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="metric" unique="false"
         eType="#//PercentageMetric"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="limitValue" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="CountRequirementLimit" eSuperTypes="#//RequirementLimit">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="metric" unique="false"
         eType="#//CountMetric"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="limitValue" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="TimeRequirementLimit" eSuperTypes="#//RequirementLimit">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="metric" unique="false"
@@ -2068,15 +2050,13 @@
     <eStructuralFeatures xsi:type="ecore:EReference" name="defaultValue" eType="#//Frequency"
         containment="true" resolveProxies="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="clockGating" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="PowerDomain" eSuperTypes="#//HwDomain">
     <eStructuralFeatures xsi:type="ecore:EReference" name="defaultValue" eType="#//Voltage"
         containment="true" resolveProxies="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="powerGating" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ProcessingUnit" eSuperTypes="#//HwModule #//HwDestination #//HwPathElement">
     <eStructuralFeatures xsi:type="ecore:EReference" name="definition" eType="#//ProcessingUnitDefinition"/>
@@ -2141,18 +2121,16 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="bitWidth" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="priority" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="portType" unique="false"
         eType="#//PortType"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="portInterface" unique="false"
         eType="#//PortInterface"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="delegated" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        changeable="false" volatile="true" transient="true" derived="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" changeable="false"
+        volatile="true" transient="true" derived="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="propertyCategory" value="Read only"/>
         <details key="get" value="&lt;%org.eclipse.emf.ecore.EObject%> _eContainer = this.eContainer();&#xA;return (_eContainer instanceof &lt;%org.eclipse.app4mc.amalthea.model.HwStructure%>);"/>
@@ -2202,8 +2180,8 @@
     <eStructuralFeatures xsi:type="ecore:EReference" name="port1" eType="#//HwPort"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="port2" eType="#//HwPort"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="internal" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        changeable="false" volatile="true" transient="true" derived="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" changeable="false"
+        volatile="true" transient="true" derived="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="propertyCategory" value="Read only"/>
         <details key="get" value="&lt;%org.eclipse.emf.ecore.EObject%> _eContainer = this.eContainer();&#xA;return (_eContainer instanceof &lt;%org.eclipse.app4mc.amalthea.model.ConnectionHandler%>);"/>
@@ -2336,14 +2314,11 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="nWays" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
         defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="coherency" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="exclusive" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="hitRate" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="HwPath" abstract="true">
     <eOperations name="getContainingAccessElement" unique="false" eType="#//HwAccessElement">
@@ -2539,8 +2514,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="DataStability">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="enabled" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="algorithm" unique="false"
         eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="accessMultiplicity" unique="false"
@@ -2549,8 +2523,7 @@
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="NonAtomicDataCoherency">
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="enabled" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="algorithm" unique="false"
         eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="accessMultiplicity" unique="false"
@@ -2586,8 +2559,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="maxValue" unique="false"
         eType="#//PositiveInt" defaultValueLiteral="1"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="ownership" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="true"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="true"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="priorityCeilingProtocol"
         unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
         defaultValueLiteral="false"/>
@@ -2735,8 +2707,7 @@
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="hasExactlyOneChild" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="propertyCategory" value="Options"/>
       </eAnnotations>
@@ -2747,8 +2718,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="many" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
         defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="mandatory" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="true"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="true"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="defaultValue" eType="#//Value"
         containment="true" resolveProxies="false"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="schedulerDefinitions" upperBound="-1"
@@ -3371,8 +3341,7 @@
       <details key="documentation" value="A switch entry for a ProbabilitySwitch.&#xA;It describes a path of the switch and it's probability."/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="probability" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble"
-        defaultValueLiteral="0.0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EDouble" defaultValueLiteral="0.0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="WhileLoop" eSuperTypes="#//ActivityGraphItem #//IActivityGraphItemContainer">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -3538,8 +3507,7 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="apply" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
         defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="offset" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="GeneralPrecedence" abstract="true" eSuperTypes="#//BaseObject">
     <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
@@ -3662,15 +3630,13 @@
     <eStructuralFeatures xsi:type="ecore:EReference" name="activations" upperBound="-1"
         eType="#//Activation"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="callback" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Marker if runnable is used as callback."/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="service" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Marker if runnable is used as a service."/>
       </eAnnotations>
@@ -3709,15 +3675,13 @@
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EReference" name="dataType" eType="#//TypeDefinition"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="constant" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Defines the label as a constant, not modifiable entity"/>
       </eAnnotations>
     </eStructuralFeatures>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="bVolatile" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="Defines if the label value is volatile or persistent to survive shutdown and start of system"/>
       </eAnnotations>
@@ -3757,11 +3721,9 @@
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EReference" name="elementType" eType="#//TypeDefinition"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="defaultElements" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="maxElements" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="channelAccesses" upperBound="-1"
         eType="#//ChannelAccess" changeable="false" volatile="true" transient="true"
         derived="true">
@@ -3937,8 +3899,7 @@
   <eClassifiers xsi:type="ecore:EClass" name="ChannelAccess" abstract="true" eSuperTypes="#//ActivityGraphItem">
     <eStructuralFeatures xsi:type="ecore:EReference" name="data" lowerBound="1" eType="#//Channel"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="elements" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="transmissionPolicy" eType="#//TransmissionPolicy"
         containment="true" resolveProxies="false"/>
   </eClassifiers>
@@ -3947,14 +3908,11 @@
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="receiveOperation" unique="false"
         eType="#//ReceiveOperation"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="dataMustBeNew" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="elementIndex" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="lowerBound" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EEnum" name="ReceiveOperation">
     <eLiterals name="_undefined_"/>
@@ -4011,8 +3969,7 @@
       <details key="documentation" value="An abstract description for sender-receiver-communication (it can be read or write)"/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="buffered" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="false"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="false"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="label" lowerBound="1" eType="#//Label"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="port" eType="#//ComponentPort"/>
   </eClassifiers>
@@ -4070,11 +4027,9 @@
       <details key="documentation" value="Describes a group of deviation runnable items"/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="ordered" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="true"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="true"/>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="interruptible" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"
-        defaultValueLiteral="true">
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean" defaultValueLiteral="true">
       <eAnnotations source="http://www.eclipse.org/emf/2002/GenModel">
         <details key="documentation" value="@since 1.2"/>
       </eAnnotations>
@@ -4179,8 +4134,7 @@
       <details key="documentation" value="Representation of an array data type"/>
     </eAnnotations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="numberElements" unique="false"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
     <eStructuralFeatures xsi:type="ecore:EReference" name="dataType" eType="#//DataType"
         containment="true" resolveProxies="false"/>
   </eClassifiers>
@@ -4407,8 +4361,7 @@
       </eAnnotations>
     </eOperations>
     <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" unique="false" lowerBound="1"
-        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"
-        defaultValueLiteral="0"/>
+        eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt" defaultValueLiteral="0"/>
   </eClassifiers>
   <eClassifiers xsi:type="ecore:EClass" name="ModeLabelRef" eSuperTypes="#//ILocalModeValueSource">
     <eOperations name="isEnum" unique="false" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean">

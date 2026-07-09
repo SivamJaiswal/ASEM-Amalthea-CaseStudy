@@ -16,7 +16,8 @@
       <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//classifiers/Classifier"/>
     </eClassifiers>
   </eSubpackages>
-  <eSubpackages name="classifiers" nsURI="edu.kit.ipd.sdq.metamodels.asem.classifiers" nsPrefix="classifiers">
+  <eSubpackages name="classifiers" nsURI="edu.kit.ipd.sdq.metamodels.asem.classifiers"
+      nsPrefix="classifiers">
     <eClassifiers xsi:type="ecore:EClass" name="Classifier" abstract="true" eSuperTypes="#//base/Named">
       <eStructuralFeatures xsi:type="ecore:EReference" name="methods" upperBound="-1"
           eType="#//dataexchange/Method" containment="true" resolveProxies="false"/>
@@ -31,7 +32,8 @@
     <eClassifiers xsi:type="ecore:EClass" name="Class" eSuperTypes="#//classifiers/Component"/>
     <eClassifiers xsi:type="ecore:EClass" name="Module" eSuperTypes="#//classifiers/Component"/>
   </eSubpackages>
-  <eSubpackages name="dataexchange" nsURI="edu.kit.ipd.sdq.metamodels.asem.dataexchange" nsPrefix="dataexchange">
+  <eSubpackages name="dataexchange" nsURI="edu.kit.ipd.sdq.metamodels.asem.dataexchange"
+      nsPrefix="dataexchange">
     <eClassifiers xsi:type="ecore:EClass" name="Variable" eSuperTypes="#//base/TypedElement">
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="readable" unique="false"
           eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>

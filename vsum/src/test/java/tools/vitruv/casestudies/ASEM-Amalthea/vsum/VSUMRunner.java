@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.resource.Resource;
+import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 
 import org.eclipse.app4mc.amalthea.model.Amalthea;
@@ -27,6 +28,7 @@ import org.eclipse.app4mc.amalthea.model.SWModel;
 
 import edu.kit.ipd.sdq.metamodels.asem.AsemFactory;
 import edu.kit.ipd.sdq.metamodels.asem.Dummy;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.Classifier;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.impl.ClassifiersFactoryImpl;
@@ -133,9 +135,13 @@ public class VSUMRunner {
         return getDefaultView(vsum, List.of(Amalthea.class));
     }
 
-    /** Returns a view containing all ASEM roots (Module instances registered by reactions). */
+    /**
+     * Returns a view containing all ASEM roots: the Dummy root plus every standalone
+     * Classifier root (Module, ComposedType, BooleanType, Unsigned/SignedDiscreteType,
+     * ContinuousType, ...) persisted independently by AmaltheaToAsem.reactions.
+     */
     public View getAsemView(VirtualModel vsum) {
-        return getDefaultView(vsum, List.of(Dummy.class, Module.class));
+        return getDefaultView(vsum, List.of(Dummy.class, Classifier.class));
     }
 
     public Amalthea getAmaltheaRoot(View view) {
@@ -157,11 +163,6 @@ public class VSUMRunner {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
-        // also check standalone Module roots directly
-        for (EObject root : getDefaultView(vsum, List.of(Module.class)).getRootObjects()) {
-            T found = findByNameAndType(root, targetType, sourceName);
-            if (found != null) return found;
-        }
         return null;
     }
 
@@ -169,6 +170,13 @@ public class VSUMRunner {
                                                               String sourceName,
                                                               Class<T> targetType) {
         for (EObject root : getAmaltheaView(vsum).getRootObjects()) {
+            T found = findByNameAndType(root, targetType, sourceName);
+            if (found != null) return found;
+        }
+        // also check standalone Component roots directly (auto-created by
+        // AsemToAmalthea.reactions via persistProjectRelative, since there is no
+        // correspondence from Module to the Amalthea root's ComponentsModel)
+        for (EObject root : getDefaultView(vsum, List.of(Component.class)).getRootObjects()) {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
@@ -296,8 +304,8 @@ public class VSUMRunner {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             EObject el = findByNameAndType(getAmaltheaRoot(v), type, name);
-            if (el != null && el.eContainer() != null)
-                el.eContainer().eContents().remove(el);
+            if (el != null)
+                EcoreUtil.remove(el);
         });
     }
 
@@ -385,8 +393,8 @@ public class VSUMRunner {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             EObject el = findInAsemView(v, type, name);
-            if (el != null && el.eContainer() != null)
-                el.eContainer().eContents().remove(el);
+            if (el != null)
+                EcoreUtil.remove(el);
         });
     }
 

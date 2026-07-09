@@ -33,6 +33,10 @@ routine createComponentForModule(asem_c::Module module) {
     }
     update {
         component.name = module.name
+        // No correspondence exists from Module to the Amalthea root's ComponentsModel,
+        // so the Component is persisted as its own resource root (anchored to the
+        // already-persisted Module) — mirroring the Module-side fix in AmaltheaToAsem.reactions.
+        persistProjectRelative(module, component, "amalthea/component_" + module.name + ".amxmi")
         addCorrespondenceBetween(module, component)
     }
 }

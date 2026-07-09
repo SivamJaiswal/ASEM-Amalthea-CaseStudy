@@ -1,25 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.0"?>
-
 <!--
+Bind to grammar/schema...
 -->
-
 <plugin>
 
+   <!--
+     AMALTHEA's EPackage is not registered here: it is consumed from the published
+     org.eclipse.app4mc:org.eclipse.app4mc.amalthea.model artifact (see model/pom.xml),
+     which carries its own plugin.xml registration for
+     uri="http://app4mc.eclipse.org/amalthea/3.3.0".
+   -->
+
    <extension point="org.eclipse.emf.ecore.generated_package">
-      <!-- @generated model -->
+      <!-- @generated asem -->
       <package
-            uri="http://vitruv.tools/methodologisttemplate/model"
-            class="tools.vitruv.methodologisttemplate.model.model.ModelPackage"
-            genModel="src/main/ecore/model.genmodel"/>
+            uri="edu.kit.ipd.sdq.metamodels.asem"
+            class="edu.kit.ipd.sdq.metamodels.asem.AsemPackage"
+            genModel="src/main/ecore/asem.genmodel"/>
    </extension>
 
    <extension point="org.eclipse.emf.ecore.generated_package">
-      <!-- @generated model2 -->
+      <!-- @generated asem -->
       <package
-            uri="http://vitruv.tools/methodologisttemplate/model2"
-            class="tools.vitruv.methodologisttemplate.model.model2.Model2Package"
-            genModel="src/main/ecore/model2.genmodel"/>
+            uri="edu.kit.ipd.sdq.metamodels.asem.base"
+            class="edu.kit.ipd.sdq.metamodels.asem.base.BasePackage"
+            genModel="src/main/ecore/asem.genmodel"/>
    </extension>
 
+   <extension point="org.eclipse.emf.ecore.generated_package">
+      <!-- @generated asem -->
+      <package
+            uri="edu.kit.ipd.sdq.metamodels.asem.classifiers"
+            class="edu.kit.ipd.sdq.metamodels.asem.classifiers.ClassifiersPackage"
+            genModel="src/main/ecore/asem.genmodel"/>
+   </extension>
+
+   <extension point="org.eclipse.emf.ecore.generated_package">
+      <!-- @generated asem -->
+      <package
+            uri="edu.kit.ipd.sdq.metamodels.asem.dataexchange"
+            class="edu.kit.ipd.sdq.metamodels.asem.dataexchange.DataexchangePackage"
+            genModel="src/main/ecore/asem.genmodel"/>
+   </extension>
+
+   <extension point="org.eclipse.emf.ecore.generated_package">
+      <!-- @generated asem -->
+      <package
+            uri="edu.kit.ipd.sdq.metamodels.asem.primitivetypes"
+            class="edu.kit.ipd.sdq.metamodels.asem.primitivetypes.PrimitivetypesPackage"
+            genModel="src/main/ecore/asem.genmodel"/>
+   </extension>
 </plugin>

@@ -34,6 +34,10 @@ routine createModuleForComponent(am::Component component) {
     }
     update {
         module.name = component.name
+        // Dummy has no containment feature for Modules, so the Module must be
+        // persisted as its own resource root (anchored to the already-persisted
+        // Component) — otherwise it's dangling the moment a later change touches it.
+        persistProjectRelative(component, module, "asem/module_" + component.name + ".asem")
         addCorrespondenceBetween(component, module)
     }
 }
@@ -345,6 +349,7 @@ routine createBooleanType(am::BaseTypeDefinition btd) {
     }
     update {
         boolType.name = btd.name
+        persistProjectRelative(btd, boolType, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, boolType)
     }
 }
@@ -370,6 +375,7 @@ routine createUnsignedDiscreteType(am::BaseTypeDefinition btd) {
     }
     update {
         ud.name = btd.name
+        persistProjectRelative(btd, ud, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, ud)
     }
 }
@@ -383,6 +389,7 @@ routine createSignedDiscreteType(am::BaseTypeDefinition btd) {
     }
     update {
         sd.name = btd.name
+        persistProjectRelative(btd, sd, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, sd)
     }
 }
@@ -418,6 +425,7 @@ routine createContinuousType(am::BaseTypeDefinition btd) {
     }
     update {
         contType.name = btd.name
+        persistProjectRelative(btd, contType, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, contType)
     }
 }
@@ -546,6 +554,10 @@ routine createComposedTypeForArray(am::Array array) {
         // because eContainer access in update blocks is not supported in this DSL version
         // Array has no name attribute in AMALTHEA — name is set from the test/caller
         composedType.name = "ComposedType"
+        // Array has no name attribute to key a per-object file on, and Dummy has no
+        // containment feature for ComposedTypes, so all of them are persisted as
+        // independent roots sharing one resource (persistAsRoot appends, not overwrites).
+        persistProjectRelative(array, composedType, "asem/composedtypes.asem")
         addCorrespondenceBetween(array, composedType)
     }
 }

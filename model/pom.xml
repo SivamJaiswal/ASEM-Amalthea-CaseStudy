@@ -46,5 +46,19 @@
       <groupId>org.eclipse.emf</groupId>
       <artifactId>org.eclipse.emf.ecore</artifactId>
     </dependency>
+    <!--
+      AMALTHEA is consumed from the published APP4MC artifact rather than generated
+      locally: its .ecore encodes derived-attribute bodies (qualifiedName, uniqueName, ...)
+      that call hand-written helper classes (AmaltheaExtensions, AmaltheaIndex,
+      AmaltheaValidations, AmaltheaServices, AmaltheaServices2) that only exist in
+      APP4MC's own source tree, not in the .ecore/.genmodel export. Only ASEM (a plain
+      metamodel with no such derived operations) is generated locally — see
+      model/workflow/generate.mwe2.
+    -->
+    <dependency>
+      <groupId>org.eclipse.app4mc</groupId>
+      <artifactId>org.eclipse.app4mc.amalthea.model</artifactId>
+      <version>3.3.0</version>
+    </dependency>
   </dependencies>
 </project>

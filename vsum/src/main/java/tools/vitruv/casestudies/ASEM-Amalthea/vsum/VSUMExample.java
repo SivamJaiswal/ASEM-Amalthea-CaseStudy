@@ -2,34 +2,65 @@ package tools.vitruv.methodologisttemplate.vsum;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
-import mir.reactions.model2Model2.Model2Model2ChangePropagationSpecification;
+
+import org.eclipse.emf.common.util.URI;
+
+import org.eclipse.app4mc.amalthea.model.Amalthea;
+import org.eclipse.app4mc.amalthea.model.AmaltheaFactory;
+import org.eclipse.app4mc.amalthea.model.Component;
+
+import mir.reactions.amaltheaToAsem.AmaltheaToAsemChangePropagationSpecification;
+import mir.reactions.asemToAmalthea.AsemToAmaltheaChangePropagationSpecification;
+
+import tools.vitruv.change.propagation.ChangePropagationSpecification;
 import tools.vitruv.change.testutils.TestUserInteraction;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.views.View;
 import tools.vitruv.framework.views.ViewTypeFactory;
 import tools.vitruv.framework.vsum.VirtualModel;
 import tools.vitruv.framework.vsum.VirtualModelBuilder;
-import tools.vitruv.methodologisttemplate.model.model.ModelFactory;
 
 /** This class provides an example how to define and use a VSUM. */
 public class VSUMExample {
+  private static final String AMALTHEA_FILE = "/amalthea.amxmi";
+
   public static void main(String[] args) throws IOException {
-    VirtualModel vsum = createDefaultVirtualModel();
-    CommittableView view = getDefaultView(vsum).withChangeDerivingTrait();
+    Path storageFolder = Path.of("vsumexample");
+    VirtualModel vsum = createDefaultVirtualModel(storageFolder);
+
+    // Register the Amalthea root; a corresponding ASEM Module is created for
+    // every Component added underneath it (see AmaltheaToAsem.reactions).
     modifyView(
-        view,
+        getDefaultView(vsum).withChangeRecordingTrait(),
         (CommittableView v) -> {
-          v.getRootObjects().add(ModelFactory.eINSTANCE.createSystem());
+          Amalthea root = AmaltheaFactory.eINSTANCE.createAmalthea();
+          root.setComponentsModel(AmaltheaFactory.eINSTANCE.createComponentsModel());
+          root.setSwModel(AmaltheaFactory.eINSTANCE.createSWModel());
+          v.registerRoot(root, URI.createFileURI(storageFolder + AMALTHEA_FILE));
+        });
+
+    modifyView(
+        getDefaultView(vsum).withChangeRecordingTrait(),
+        (CommittableView v) -> {
+          Amalthea root = v.getRootObjects(Amalthea.class).iterator().next();
+          Component component = AmaltheaFactory.eINSTANCE.createComponent();
+          component.setName("ExampleComponent");
+          root.getComponentsModel().getComponents().add(component);
         });
   }
 
-  private static VirtualModel createDefaultVirtualModel() throws IOException {
+  private static VirtualModel createDefaultVirtualModel(Path storageFolder) throws IOException {
+    Iterable<ChangePropagationSpecification> specs =
+        List.of(
+            new AmaltheaToAsemChangePropagationSpecification(),
+            new AsemToAmaltheaChangePropagationSpecification());
     return new VirtualModelBuilder()
-        .withStorageFolder(Path.of("vsumexample"))
+        .withStorageFolder(storageFolder)
         .withUserInteractorForResultProvider(
             new TestUserInteraction.ResultProvider(new TestUserInteraction()))
-        .withChangePropagationSpecifications(new Model2Model2ChangePropagationSpecification())
+        .withChangePropagationSpecifications(specs)
         .buildAndInitialize();
   }
 
