@@ -13,3 +13,7 @@ plugin.properties
 .DS_Store
 .project
 .settings/
+
+# Personal notes
+CLAUDE.md
+docs/
