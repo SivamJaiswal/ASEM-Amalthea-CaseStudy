@@ -97,7 +97,7 @@ reaction RunnableCreated {
 routine createMethodForRunnable(am::Runnable runnable) {
     match {
         require absence of asem_d::Method corresponding to runnable
-        val module = retrieve asem_c::Module corresponding to runnable.eContainer
+        val module = retrieve asem_c::Module corresponding to runnable.referringComponents.head
     }
     create {
         val method = new asem_d::Method
@@ -160,7 +160,7 @@ reaction VariableLabelCreated {
 routine createMessageForLabel(am::Label label) {
     match {
         require absence of asem_d::Message corresponding to label
-        val module = retrieve asem_c::Module corresponding to label.eContainer
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
     }
     create {
         val message = new asem_d::Message
@@ -182,7 +182,7 @@ reaction ConstantLabelCreated {
 routine createConstantForLabel(am::Label label) {
     match {
         require absence of asem_d::Constant corresponding to label
-        val module = retrieve asem_c::Module corresponding to label.eContainer
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
     }
     create {
         val constant = new asem_d::Constant
@@ -268,7 +268,7 @@ reaction LabelFlippedToConstant {
 routine swapMessageToConstant(am::Label label) {
     match {
         val message = retrieve asem_d::Message corresponding to label
-        val module  = retrieve asem_c::Module corresponding to label.eContainer
+        val module  = retrieve asem_c::Module corresponding to label.referringComponents.head
     }
     create {
         val newConstant = new asem_d::Constant
@@ -293,7 +293,7 @@ reaction LabelFlippedToVariable {
 routine swapConstantToMessage(am::Label label) {
     match {
         val constant = retrieve asem_d::Constant corresponding to label
-        val module   = retrieve asem_c::Module corresponding to label.eContainer
+        val module   = retrieve asem_c::Module corresponding to label.referringComponents.head
     }
     create {
         val newMessage = new asem_d::Message
@@ -430,100 +430,18 @@ routine createContinuousType(am::BaseTypeDefinition btd) {
     }
 }
 
-// P11 — BaseTypeDefinition.size changed → remove old primitive, create new one
-// NOTE — size is an attribute (DataSize), not a reference, so we use
-// "after attribute replaced at" — but DataSize is a contained object so
-// we listen for the size attribute of BaseTypeDefinition directly.
-// P11 — BaseTypeDefinition size changed → remove old primitive, create new one
-// NOTE — BaseTypeDefinition.size is a contained DataSize object (EReference, not EAttribute).
-// The Reactions DSL "after attribute replaced" only works on EAttribute features.
-// Navigating up from DataSize via eContainer or instanceof is also not supported in
-// update blocks. P11 therefore listens on the BaseTypeDefinition element itself
-// being replaced (deleted + created), which covers the case where a new DataSize
-// is assigned. If Benedikt requires runtime size changes, a custom Java propagation
-// spec must be used instead of the Reactions DSL for this rule.
-reaction BaseTypeDefinitionRecreated {
-    after element am::BaseTypeDefinition created
-    call replacePrimitiveTypeOnRecreation(affectedEObject)
-}
-
-routine replacePrimitiveTypeOnRecreation(am::BaseTypeDefinition btd) {
-    update {
-        // clean up any stale primitive from a previous version of this BTD
-        removeOldBooleanType(btd)
-        removeOldUnsignedDiscreteType(btd)
-        removeOldSignedDiscreteType(btd)
-        removeOldContinuousType(btd)
-        // the creation reactions (E14/E15/E16) will fire immediately after
-        // and create the correct new primitive — nothing more needed here
-    }
-}
-
-routine removeOldBooleanType(am::BaseTypeDefinition btd) {
-    match {
-        val old = retrieve asem_p::BooleanType corresponding to btd
-    }
-    update {
-        removeObject(old)
-        removeCorrespondenceBetween(btd, old)
-    }
-}
-
-routine removeOldUnsignedDiscreteType(am::BaseTypeDefinition btd) {
-    match {
-        val old = retrieve asem_p::UnsignedDiscreteType corresponding to btd
-    }
-    update {
-        removeObject(old)
-        removeCorrespondenceBetween(btd, old)
-    }
-}
-
-routine removeOldSignedDiscreteType(am::BaseTypeDefinition btd) {
-    match {
-        val old = retrieve asem_p::SignedDiscreteType corresponding to btd
-    }
-    update {
-        removeObject(old)
-        removeCorrespondenceBetween(btd, old)
-    }
-}
-
-routine removeOldContinuousType(am::BaseTypeDefinition btd) {
-    match {
-        val old = retrieve asem_p::ContinuousType corresponding to btd
-    }
-    update {
-        removeObject(old)
-        removeCorrespondenceBetween(btd, old)
-    }
-}
-
-routine replacePrimitiveType(am::BaseTypeDefinition btd) {
-    update {
-        removeOldBooleanType(btd)
-        removeOldUnsignedDiscreteType(btd)
-        removeOldSignedDiscreteType(btd)
-        removeOldContinuousType(btd)
-        // re-create based on new size — call the creation routines directly
-        // guard checks are duplicated here because the reaction guards only
-        // fire on first creation, not on size change
-        if (btd.size !== null) {
-            val sizeVal = btd.size.value.intValue
-            val hasContinuousAlias = btd.aliases.exists[
-                alias.toLowerCase.contains("float") ||
-                alias.toLowerCase.contains("double")]
-            if (sizeVal == 1) {
-                createBooleanType(btd)
-            } else if ((sizeVal == 8 || sizeVal == 16 || sizeVal == 32)
-                       && !hasContinuousAlias) {
-                createDiscreteType(btd)
-            } else if ((sizeVal == 32 || sizeVal == 64) && hasContinuousAlias) {
-                createContinuousType(btd)
-            }
-        }
-    }
-}
+// NOTE on P11 (BaseTypeDefinition.size changed → remove old primitive, create new one):
+//   BaseTypeDefinition.size is a contained DataSize object (EReference, not EAttribute), so
+//   "after attribute replaced" can't listen on it directly, and eContainer/instanceof
+//   navigation from DataSize isn't supported in update blocks either. The only event the DSL
+//   can listen on is "after element am::BaseTypeDefinition created" — but that event fires
+//   identically for a genuinely first-time creation and for a delete+recreate, and the DSL
+//   gives no way to distinguish the two from within the reaction. An earlier implementation
+//   here registered an unconditional reaction on that same event to clean up "the old
+//   primitive" — but since it fires in the same batch as (and after) E14/E15/E16's guarded
+//   creation reactions, it ended up deleting the primitive type those reactions had just
+//   created moments earlier, breaking every first-time creation. P11 is therefore omitted
+//   from this file; a custom Java propagation spec would be needed to implement it correctly.
 
 
 // ─────────────────────────────────────────────────────────────────────────────

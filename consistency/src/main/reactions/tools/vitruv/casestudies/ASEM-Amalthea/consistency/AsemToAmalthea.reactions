@@ -1,4 +1,5 @@
 import "http://app4mc.eclipse.org/amalthea/3.3.0" as am
+import "edu.kit.ipd.sdq.metamodels.asem" as asem
 import "edu.kit.ipd.sdq.metamodels.asem.classifiers" as asem_c
 import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 
@@ -9,8 +10,14 @@ import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 // Correspondences are NOT created here — looked up from amaltheaToAsem.
 
 // NOTE — segment name must start with lowercase (Reactions DSL requirement)
+// NOTE — the trigger source below must be the ROOT asem package, not a sub-package
+// (asem_c/asem_d/etc.): asem.ecore nests classifiers/dataexchange/primitivetypes/base as
+// eSubpackages of one root "asem" package, and Vitruv's change-descriptor computation walks
+// any change up to the TOP-MOST enclosing EPackage. Declaring "asem_c" here meant this whole
+// reaction segment's registered source descriptor never matched any real ASEM-side change,
+// so it silently never fired for any Module/Method/Message/Constant change.
 reactions: asemToAmalthea
-in reaction to changes in asem_c
+in reaction to changes in asem
 execute actions in am
 
 
@@ -102,6 +109,12 @@ routine createRunnableForMethod(asem_d::Method method) {
     }
     update {
         runnable.name = method.name
+        // Runnable's only EMF containment parent is SWModel, which this standalone,
+        // persistProjectRelative-anchored Component has no path to (see createComponentForModule
+        // above) — persist Runnable as its own resource root too, anchored to the
+        // already-persisted Method, then attach it via Component's non-containment
+        // "runnables" reference for the semantic link.
+        persistProjectRelative(method, runnable, "amalthea/runnable_" + method.name + ".amxmi")
         component.runnables += runnable
         addCorrespondenceBetween(method, runnable)
     }
@@ -164,6 +177,10 @@ routine createLabelForMessage(asem_d::Message message) {
     update {
         label.name     = message.name
         label.constant = false
+        // See createRunnableForMethod above: Label's only EMF containment parent is
+        // SWModel, unreachable from this standalone Component — persist Label as its
+        // own resource root, anchored to the already-persisted Message.
+        persistProjectRelative(message, label, "amalthea/label_" + message.name + ".amxmi")
         component.labels += label
         addCorrespondenceBetween(message, label)
     }
@@ -186,6 +203,10 @@ routine createLabelForConstant(asem_d::Constant constant) {
     update {
         label.name     = constant.name
         label.constant = true
+        // See createRunnableForMethod above: Label's only EMF containment parent is
+        // SWModel, unreachable from this standalone Component — persist Label as its
+        // own resource root, anchored to the already-persisted Constant.
+        persistProjectRelative(constant, label, "amalthea/label_" + constant.name + ".amxmi")
         component.labels += label
         addCorrespondenceBetween(constant, label)
     }

@@ -173,10 +173,11 @@ public class VSUMRunner {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
-        // also check standalone Component roots directly (auto-created by
-        // AsemToAmalthea.reactions via persistProjectRelative, since there is no
-        // correspondence from Module to the Amalthea root's ComponentsModel)
-        for (EObject root : getDefaultView(vsum, List.of(Component.class)).getRootObjects()) {
+        // also check standalone Component/Runnable/Label roots directly (auto-created by
+        // AsemToAmalthea.reactions via persistProjectRelative, since none of them have a
+        // correspondence/containment path back to the Amalthea root's SWModel/ComponentsModel)
+        for (EObject root : getDefaultView(vsum,
+                List.of(Component.class, Runnable.class, Label.class)).getRootObjects()) {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
@@ -225,6 +226,7 @@ public class VSUMRunner {
                     getAmaltheaRoot(v), Component.class, componentName);
             Runnable r = AmaltheaFactory.eINSTANCE.createRunnable();
             r.setName(runnableName);
+            getAmaltheaRoot(v).getSwModel().getRunnables().add(r);
             comp.getRunnables().add(r);
         });
         return runnableName;
@@ -239,6 +241,7 @@ public class VSUMRunner {
             Label label = AmaltheaFactory.eINSTANCE.createLabel();
             label.setName(labelName);
             label.setConstant(constant);
+            getAmaltheaRoot(v).getSwModel().getLabels().add(label);
             comp.getLabels().add(label);
         });
         return labelName;

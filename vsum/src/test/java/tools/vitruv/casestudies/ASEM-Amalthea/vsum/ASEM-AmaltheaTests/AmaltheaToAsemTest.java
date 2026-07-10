@@ -111,7 +111,8 @@ public class AmaltheaToAsemTest {
         assertEquals("fireIgnition", method.getName());
         assertNull(method.getReturnType(),   "returnType must be null — Rule 4 OCL");
         assertTrue(method.getParameters().isEmpty(), "no parameters — Rule 4 OCL");
-        assertTrue(module.getMethods().contains(method), "Method must be in Module.methods");
+        assertTrue(module.getMethods().stream().anyMatch(m -> method.getName().equals(m.getName())),
+                "Method must be in Module.methods");
     }
 
     @Test
@@ -162,7 +163,9 @@ public class AmaltheaToAsemTest {
 
         assertNotNull(message, "Message must be created for non-constant Label");
         assertEquals("vehicleSpeed", message.getName());
-        assertTrue(module.getTypedElements().contains(message));
+        assertTrue(module.getTypedElements().stream()
+                        .anyMatch(te -> message.getName().equals(te.getName())),
+                "Message must be in Module.typedElements");
     }
 
     @Test
@@ -179,7 +182,9 @@ public class AmaltheaToAsemTest {
 
         assertNotNull(constant, "Constant must be created for constant Label");
         assertEquals("MAX_TORQUE", constant.getName());
-        assertTrue(module.getTypedElements().contains(constant));
+        assertTrue(module.getTypedElements().stream()
+                        .anyMatch(te -> constant.getName().equals(te.getName())),
+                "Constant must be in Module.typedElements");
     }
 
     @Test

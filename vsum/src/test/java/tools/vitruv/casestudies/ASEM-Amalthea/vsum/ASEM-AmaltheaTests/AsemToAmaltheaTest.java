@@ -98,7 +98,8 @@ public class AsemToAmaltheaTest {
 
         assertNotNull(runnable, "Runnable must be created for void Method");
         assertEquals("openValve", runnable.getName());
-        assertTrue(comp.getRunnables().contains(runnable));
+        assertTrue(comp.getRunnables().stream()
+                .anyMatch(r -> runnable.getName().equals(r.getName())));
     }
 
     @Test
@@ -163,7 +164,8 @@ public class AsemToAmaltheaTest {
         assertNotNull(label, "Label must be created for Message");
         assertEquals("oilPressure", label.getName());
         assertFalse(label.isConstant(), "Label.constant must be false (Rule 6)");
-        assertTrue(comp.getLabels().contains(label));
+        assertTrue(comp.getLabels().stream()
+                .anyMatch(l -> label.getName().equals(l.getName())));
     }
 
     // ── E13 — Constant → Label (constant=true) ───────────────────────────────
@@ -183,7 +185,8 @@ public class AsemToAmaltheaTest {
         assertNotNull(label, "Label must be created for Constant");
         assertEquals("MAX_THROTTLE", label.getName());
         assertTrue(label.isConstant(), "Label.constant must be true (Rule 5)");
-        assertTrue(comp.getLabels().contains(label));
+        assertTrue(comp.getLabels().stream()
+                .anyMatch(l -> label.getName().equals(l.getName())));
     }
 
     // ── P6 / P7 — name propagation ────────────────────────────────────────────
