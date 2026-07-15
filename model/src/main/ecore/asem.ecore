@@ -31,6 +31,13 @@
     </eClassifiers>
     <eClassifiers xsi:type="ecore:EClass" name="Class" eSuperTypes="#//classifiers/Component"/>
     <eClassifiers xsi:type="ecore:EClass" name="Module" eSuperTypes="#//classifiers/Component"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="Task" eSuperTypes="#//classifiers/Classifier">
+      <eStructuralFeatures xsi:type="ecore:EReference" name="processes" upperBound="-1"
+          eType="#//dataexchange/Method"/>
+    </eClassifiers>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="InterruptTask" eSuperTypes="#//classifiers/Task"/>
   </eSubpackages>
   <eSubpackages name="dataexchange" nsURI="edu.kit.ipd.sdq.metamodels.asem.dataexchange"
       nsPrefix="dataexchange">
@@ -63,6 +70,14 @@
     <eClassifiers xsi:type="ecore:EClass" name="Constant" eSuperTypes="#//base/TypedElement">
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
     </eClassifiers>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="SystemConstant" eSuperTypes="#//dataexchange/Constant"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="Argument" eSuperTypes="#//dataexchange/Variable"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="Input" eSuperTypes="#//dataexchange/Variable"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="Output" eSuperTypes="#//dataexchange/Variable"/>
   </eSubpackages>
   <eSubpackages name="primitivetypes" nsURI="edu.kit.ipd.sdq.metamodels.asem.primitivetypes"
       nsPrefix="primitivetypes">

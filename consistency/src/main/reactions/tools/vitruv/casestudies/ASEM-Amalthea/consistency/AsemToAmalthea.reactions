@@ -2,9 +2,10 @@ import "http://app4mc.eclipse.org/amalthea/3.3.0" as am
 import "edu.kit.ipd.sdq.metamodels.asem" as asem
 import "edu.kit.ipd.sdq.metamodels.asem.classifiers" as asem_c
 import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
+import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
 
 // Change propagation: ASEM (KIT) --> AMALTHEA (APP4MC 3.3.0)
-// Existence rules  : E3, E4, E7, E8, E12, E13
+// Existence rules  : E3, E4, E7, E8, E12, E13, E14, E15, E16, E17
 // Property rules   : P2, P4, P6, P7
 // Structural rules : S3, S4, S7, S8
 // Correspondences are NOT created here — looked up from amaltheaToAsem.
@@ -239,5 +240,383 @@ routine syncConstantNameToLabel(asem_d::Constant constant) {
     }
     update {
         label.name = constant.name
+    }
+}
+
+// Input/Output/SystemConstant reverse direction, mirroring
+// Message/Constant exactly (both simply set label.constant, same as Message's reverse
+// reaction; reactions fire on exact declared type, so these don't double-fire the
+// Message/Constant reactions above even though Input/Output extend Variable and
+// SystemConstant extends Constant).
+
+// Input created → create a non-constant Label
+reaction InputCreated {
+    after element asem_d::Input created
+    call createLabelForInput(affectedEObject)
+}
+
+routine createLabelForInput(asem_d::Input input) {
+    match {
+        require absence of am::Label corresponding to input
+        val component = retrieve am::Component corresponding to input.eContainer
+    }
+    create {
+        val label = new am::Label
+    }
+    update {
+        label.name     = input.name
+        label.constant = false
+        persistProjectRelative(input, label, "amalthea/label_" + input.name + ".amxmi")
+        component.labels += label
+        addCorrespondenceBetween(input, label)
+    }
+}
+
+// Output created → create a non-constant Label
+reaction OutputCreated {
+    after element asem_d::Output created
+    call createLabelForOutput(affectedEObject)
+}
+
+routine createLabelForOutput(asem_d::Output output) {
+    match {
+        require absence of am::Label corresponding to output
+        val component = retrieve am::Component corresponding to output.eContainer
+    }
+    create {
+        val label = new am::Label
+    }
+    update {
+        label.name     = output.name
+        label.constant = false
+        persistProjectRelative(output, label, "amalthea/label_" + output.name + ".amxmi")
+        component.labels += label
+        addCorrespondenceBetween(output, label)
+    }
+}
+
+// SystemConstant created → create a constant Label
+reaction SystemConstantCreated {
+    after element asem_d::SystemConstant created
+    call createLabelForSystemConstant(affectedEObject)
+}
+
+routine createLabelForSystemConstant(asem_d::SystemConstant systemConstant) {
+    match {
+        require absence of am::Label corresponding to systemConstant
+        val component = retrieve am::Component corresponding to systemConstant.eContainer
+    }
+    create {
+        val label = new am::Label
+    }
+    update {
+        label.name     = systemConstant.name
+        label.constant = true
+        persistProjectRelative(systemConstant, label, "amalthea/label_" + systemConstant.name + ".amxmi")
+        component.labels += label
+        addCorrespondenceBetween(systemConstant, label)
+    }
+}
+
+// Input.name changed → update Label.name
+reaction InputRenamed {
+    after attribute replaced at asem_d::Input[name]
+    call syncInputNameToLabel(affectedEObject)
+}
+
+routine syncInputNameToLabel(asem_d::Input input) {
+    match {
+        val label = retrieve am::Label corresponding to input
+    }
+    update {
+        label.name = input.name
+    }
+}
+
+// Output.name changed → update Label.name
+reaction OutputRenamed {
+    after attribute replaced at asem_d::Output[name]
+    call syncOutputNameToLabel(affectedEObject)
+}
+
+routine syncOutputNameToLabel(asem_d::Output output) {
+    match {
+        val label = retrieve am::Label corresponding to output
+    }
+    update {
+        label.name = output.name
+    }
+}
+
+// SystemConstant.name changed → update Label.name
+reaction SystemConstantRenamed {
+    after attribute replaced at asem_d::SystemConstant[name]
+    call syncSystemConstantNameToLabel(affectedEObject)
+}
+
+routine syncSystemConstantNameToLabel(asem_d::SystemConstant systemConstant) {
+    match {
+        val label = retrieve am::Label corresponding to systemConstant
+    }
+    update {
+        label.name = systemConstant.name
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 4 — PrimitiveType -> BaseTypeDefinition (Rules 7-9, reverse of E14-E16)
+//             ComposedType -> Array (Rule 10, reverse of E17)
+//
+// reverse direction for R7-R10, added per supervisor
+// direction ("Add the direction ASEM -> Amalthea"). Sizes are hardcoded to the
+// maximum valid value for each rule's own OCL bound (1/32/32/64 bits), per
+// supervisor's "set the maximum valid size" suggestion, since none of ASEM's
+// primitive types store a size themselves.
+//
+// NOTE — P12 (Array.numberElements <-> ComposedType) is explicitly OUT OF SCOPE
+// here: ComposedType has no matching size field, and adding one is P12's job,
+// not R10's. The Array created below is left at numberElements default (0).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// E14 reverse — BooleanType created -> BaseTypeDefinition (size=1 bit)
+reaction BooleanTypeCreated {
+    after element asem_p::BooleanType created
+    call createBaseTypeForBoolean(affectedEObject)
+}
+
+routine createBaseTypeForBoolean(asem_p::BooleanType boolType) {
+    match {
+        require absence of am::BaseTypeDefinition corresponding to boolType
+    }
+    create {
+        val btd = new am::BaseTypeDefinition
+        val size = new am::DataSize
+    }
+    update {
+        btd.name = boolType.name
+        size.value = 1bi
+        size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
+        btd.size = size
+        persistProjectRelative(boolType, btd, "amalthea/type_" + boolType.name + ".amxmi")
+        addCorrespondenceBetween(boolType, btd)
+    }
+}
+
+// E15 reverse — UnsignedDiscreteType/SignedDiscreteType created -> BaseTypeDefinition (size=32 bit)
+reaction UnsignedDiscreteTypeCreated {
+    after element asem_p::UnsignedDiscreteType created
+    call createBaseTypeForUnsignedDiscrete(affectedEObject)
+}
+
+routine createBaseTypeForUnsignedDiscrete(asem_p::UnsignedDiscreteType udType) {
+    match {
+        require absence of am::BaseTypeDefinition corresponding to udType
+    }
+    create {
+        val btd = new am::BaseTypeDefinition
+        val size = new am::DataSize
+        val alias = new am::Alias
+    }
+    update {
+        btd.name = udType.name
+        size.value = 32bi
+        size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
+        btd.size = size
+        // "u" prefix keeps this consistent with the forward direction's own
+        // unsigned/signed discriminator at AmaltheaToAsem.reactions:400
+        alias.target = "asem"
+        alias.alias = "u" + udType.name
+        btd.aliases += alias
+        persistProjectRelative(udType, btd, "amalthea/type_" + udType.name + ".amxmi")
+        addCorrespondenceBetween(udType, btd)
+    }
+}
+
+reaction SignedDiscreteTypeCreated {
+    after element asem_p::SignedDiscreteType created
+    call createBaseTypeForSignedDiscrete(affectedEObject)
+}
+
+routine createBaseTypeForSignedDiscrete(asem_p::SignedDiscreteType sdType) {
+    match {
+        require absence of am::BaseTypeDefinition corresponding to sdType
+    }
+    create {
+        val btd = new am::BaseTypeDefinition
+        val size = new am::DataSize
+        val alias = new am::Alias
+    }
+    update {
+        btd.name = sdType.name
+        size.value = 32bi
+        size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
+        btd.size = size
+        alias.target = "asem"
+        alias.alias = sdType.name
+        btd.aliases += alias
+        persistProjectRelative(sdType, btd, "amalthea/type_" + sdType.name + ".amxmi")
+        addCorrespondenceBetween(sdType, btd)
+    }
+}
+
+// E16 reverse — ContinuousType created -> BaseTypeDefinition (size=64 bit)
+reaction ContinuousTypeCreated {
+    after element asem_p::ContinuousType created
+    call createBaseTypeForContinuous(affectedEObject)
+}
+
+routine createBaseTypeForContinuous(asem_p::ContinuousType contType) {
+    match {
+        require absence of am::BaseTypeDefinition corresponding to contType
+    }
+    create {
+        val btd = new am::BaseTypeDefinition
+        val size = new am::DataSize
+        val alias = new am::Alias
+    }
+    update {
+        btd.name = contType.name
+        size.value = 64bi
+        size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
+        btd.size = size
+        // "double" keeps this consistent with the forward direction's own
+        // float/double discriminator at AmaltheaToAsem.reactions:414
+        alias.target = "asem"
+        alias.alias = "double" + contType.name
+        btd.aliases += alias
+        persistProjectRelative(contType, btd, "amalthea/type_" + contType.name + ".amxmi")
+        addCorrespondenceBetween(contType, btd)
+    }
+}
+
+// E17 reverse — ComposedType created -> Array
+reaction ComposedTypeCreated {
+    after element asem_c::ComposedType created
+    call createArrayForComposedType(affectedEObject)
+}
+
+routine createArrayForComposedType(asem_c::ComposedType composedType) {
+    match {
+        require absence of am::Array corresponding to composedType
+    }
+    create {
+        val array = new am::Array
+    }
+    update {
+        // numberElements intentionally left at its default (0) — ComposedType has
+        // no matching size field; adding one is P12, explicitly out of scope here.
+        persistProjectRelative(composedType, array, "amalthea/array_" + composedType.name + ".amxmi")
+        addCorrespondenceBetween(composedType, array)
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 5 — Task/InterruptTask ↔ Task/ISR   (Rules 2 & 3, reverse direction)
+//
+// correspondences are NOT created here, only looked up,
+// same convention as the rest of this file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ASEM Task created → create an AMALTHEA Task
+reaction AsemTaskCreated {
+    after element asem_c::Task created
+    call createTaskForAsemTask(affectedEObject)
+}
+
+routine createTaskForAsemTask(asem_c::Task asemTask) {
+    match {
+        require absence of am::Task corresponding to asemTask
+    }
+    create {
+        val task = new am::Task
+    }
+    update {
+        task.name = asemTask.name
+        persistProjectRelative(asemTask, task, "amalthea/task_" + asemTask.name + ".amxmi")
+        addCorrespondenceBetween(asemTask, task)
+    }
+}
+
+// ASEM InterruptTask created → create an AMALTHEA ISR
+reaction AsemInterruptTaskCreated {
+    after element asem_c::InterruptTask created
+    call createISRForInterruptTask(affectedEObject)
+}
+
+routine createISRForInterruptTask(asem_c::InterruptTask interruptTask) {
+    match {
+        require absence of am::ISR corresponding to interruptTask
+    }
+    create {
+        val isr = new am::ISR
+    }
+    update {
+        isr.name = interruptTask.name
+        persistProjectRelative(interruptTask, isr, "amalthea/isr_" + interruptTask.name + ".amxmi")
+        addCorrespondenceBetween(interruptTask, isr)
+    }
+}
+
+// ASEM Task deleted → delete corresponding AMALTHEA Task
+reaction AsemTaskDeleted {
+    after element asem_c::Task deleted
+    call deleteTaskForAsemTask(affectedEObject)
+}
+
+routine deleteTaskForAsemTask(asem_c::Task asemTask) {
+    match {
+        val task = retrieve am::Task corresponding to asemTask
+    }
+    update {
+        removeObject(task)
+        removeCorrespondenceBetween(asemTask, task)
+    }
+}
+
+// ASEM InterruptTask deleted → delete corresponding AMALTHEA ISR
+reaction AsemInterruptTaskDeleted {
+    after element asem_c::InterruptTask deleted
+    call deleteISRForInterruptTask(affectedEObject)
+}
+
+routine deleteISRForInterruptTask(asem_c::InterruptTask interruptTask) {
+    match {
+        val isr = retrieve am::ISR corresponding to interruptTask
+    }
+    update {
+        removeObject(isr)
+        removeCorrespondenceBetween(interruptTask, isr)
+    }
+}
+
+// ASEM Task.name changed → update AMALTHEA Task.name
+reaction AsemTaskRenamed {
+    after attribute replaced at asem_c::Task[name]
+    call syncAsemTaskNameToTask(affectedEObject)
+}
+
+routine syncAsemTaskNameToTask(asem_c::Task asemTask) {
+    match {
+        val task = retrieve am::Task corresponding to asemTask
+    }
+    update {
+        task.name = asemTask.name
+    }
+}
+
+// ASEM InterruptTask.name changed → update AMALTHEA ISR.name
+reaction AsemInterruptTaskRenamed {
+    after attribute replaced at asem_c::InterruptTask[name]
+    call syncInterruptTaskNameToISR(affectedEObject)
+}
+
+routine syncInterruptTaskNameToISR(asem_c::InterruptTask interruptTask) {
+    match {
+        val isr = retrieve am::ISR corresponding to interruptTask
+    }
+    update {
+        isr.name = interruptTask.name
     }
 }

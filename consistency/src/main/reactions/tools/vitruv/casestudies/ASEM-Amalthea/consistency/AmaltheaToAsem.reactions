@@ -150,10 +150,69 @@ routine syncRunnableNameToMethod(am::Runnable runnable) {
 // Label constant=true  → Constant  (Rule 5)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// E9 — non-constant Label created → create a Message
-reaction VariableLabelCreated {
+// E9 split three ways using Label.labelAccesses[].access
+// (read/write), an already-modeled AMALTHEA field, instead of always creating a
+// Message. Read-only accessors -> Input, write-only -> Output, mixed/no accesses
+// yet -> Message (unchanged fallback). LabelAccess is normally added AFTER the
+// Label itself, so most Labels land in the Message fallback at creation time —
+// see LabelAccessCreated below, which retroactively swaps Message -> Input/Output
+// once the access pattern becomes known.
+
+// E9a — non-constant Label, read-only accesses → Input
+reaction InputLabelCreated {
     after element am::Label created
         with affectedEObject.constant == false
+          && affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.READ]
+          && !affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.WRITE]
+    call createInputForLabel(affectedEObject)
+}
+
+routine createInputForLabel(am::Label label) {
+    match {
+        require absence of asem_d::Input corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val input = new asem_d::Input
+    }
+    update {
+        input.name = label.name
+        module.typedElements += input
+        addCorrespondenceBetween(label, input)
+    }
+}
+
+// E9b — non-constant Label, write-only accesses → Output
+reaction OutputLabelCreated {
+    after element am::Label created
+        with affectedEObject.constant == false
+          && affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.WRITE]
+          && !affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.READ]
+    call createOutputForLabel(affectedEObject)
+}
+
+routine createOutputForLabel(am::Label label) {
+    match {
+        require absence of asem_d::Output corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val output = new asem_d::Output
+    }
+    update {
+        output.name = label.name
+        module.typedElements += output
+        addCorrespondenceBetween(label, output)
+    }
+}
+
+// E9c — non-constant Label, mixed/no accesses yet → Message (fallback, unchanged behavior)
+reaction MessageLabelCreated {
+    after element am::Label created
+        with affectedEObject.constant == false
+          && (affectedEObject.labelAccesses.empty
+              || (affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.READ]
+                  && affectedEObject.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.WRITE]))
     call createMessageForLabel(affectedEObject)
 }
 
@@ -172,10 +231,82 @@ routine createMessageForLabel(am::Label label) {
     }
 }
 
-// E10 — constant Label created → create a Constant
+// LabelAccess created after the Label it references: retroactively
+// swap the Label's ASEM counterpart from Message to Input/Output once the read/write
+// pattern becomes known. Only acts if the Label is currently represented as a Message
+// (i.e. was created before its access pattern was known); does nothing otherwise.
+reaction LabelAccessCreated {
+    after element am::LabelAccess created
+        with affectedEObject.data !== null
+    call resyncLabelVariableKind(affectedEObject)
+}
+
+routine resyncLabelVariableKind(am::LabelAccess labelAccess) {
+    match {
+        val message = retrieve asem_d::Message corresponding to labelAccess.data
+        val module  = retrieve asem_c::Module corresponding to labelAccess.data.referringComponents.head
+    }
+    create {
+        val input = new asem_d::Input
+        val output = new asem_d::Output
+    }
+    update {
+        val label = labelAccess.data
+        val isReadOnly = label.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.READ]
+            && !label.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.WRITE]
+        val isWriteOnly = label.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.WRITE]
+            && !label.labelAccesses.exists[access == org.eclipse.app4mc.amalthea.model.LabelAccessEnum.READ]
+        if (isReadOnly) {
+            module.typedElements -= message
+            removeObject(message)
+            removeCorrespondenceBetween(label, message)
+            input.name = label.name
+            module.typedElements += input
+            addCorrespondenceBetween(label, input)
+        } else if (isWriteOnly) {
+            module.typedElements -= message
+            removeObject(message)
+            removeCorrespondenceBetween(label, message)
+            output.name = label.name
+            module.typedElements += output
+            addCorrespondenceBetween(label, output)
+        }
+    }
+}
+
+// SystemConstant discriminator: a constant=true Label carrying
+// a Tag named/typed "systemConstant" (AMALTHEA's existing generic tagging mechanism,
+// via ITaggable) becomes a SystemConstant instead of a plain Constant. No new field
+// needed, no guessing at the unavailable thesis figure.
+
+// E10a — constant Label tagged "systemConstant" → SystemConstant
+reaction SystemConstantLabelCreated {
+    after element am::Label created
+        with affectedEObject.constant == true
+          && affectedEObject.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
+    call createSystemConstantForLabel(affectedEObject)
+}
+
+routine createSystemConstantForLabel(am::Label label) {
+    match {
+        require absence of asem_d::SystemConstant corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val systemConstant = new asem_d::SystemConstant
+    }
+    update {
+        systemConstant.name = label.name
+        module.typedElements += systemConstant
+        addCorrespondenceBetween(label, systemConstant)
+    }
+}
+
+// E10b — constant Label, no systemConstant tag → Constant (unchanged default behavior)
 reaction ConstantLabelCreated {
     after element am::Label created
         with affectedEObject.constant == true
+          && !affectedEObject.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
     call createConstantForLabel(affectedEObject)
 }
 
@@ -194,7 +325,7 @@ routine createConstantForLabel(am::Label label) {
     }
 }
 
-// E11 — Label deleted → remove the Message or Constant counterpart
+// E11 — Label deleted → remove whichever ASEM counterpart it has
 reaction LabelDeleted {
     after element am::Label deleted
     call deleteLabelCorrespondence(affectedEObject)
@@ -220,14 +351,47 @@ routine deleteLabelCorrespondenceAsConstant(am::Label label) {
     }
 }
 
+routine deleteLabelCorrespondenceAsInput(am::Label label) {
+    match {
+        val input = retrieve asem_d::Input corresponding to label
+    }
+    update {
+        removeObject(input)
+        removeCorrespondenceBetween(label, input)
+    }
+}
+
+routine deleteLabelCorrespondenceAsOutput(am::Label label) {
+    match {
+        val output = retrieve asem_d::Output corresponding to label
+    }
+    update {
+        removeObject(output)
+        removeCorrespondenceBetween(label, output)
+    }
+}
+
+routine deleteLabelCorrespondenceAsSystemConstant(am::Label label) {
+    match {
+        val systemConstant = retrieve asem_d::SystemConstant corresponding to label
+    }
+    update {
+        removeObject(systemConstant)
+        removeCorrespondenceBetween(label, systemConstant)
+    }
+}
+
 routine deleteLabelCorrespondence(am::Label label) {
     update {
         deleteLabelCorrespondenceAsMessage(label)
         deleteLabelCorrespondenceAsConstant(label)
+        deleteLabelCorrespondenceAsInput(label)
+        deleteLabelCorrespondenceAsOutput(label)
+        deleteLabelCorrespondenceAsSystemConstant(label)
     }
 }
 
-// P5 — Label.name changed → update Message.name or Constant.name
+// P5 — Label.name changed → update whichever ASEM counterpart it has
 reaction LabelRenamed {
     after attribute replaced at am::Label[name]
     call syncLabelName(affectedEObject)
@@ -251,19 +415,62 @@ routine syncLabelNameAsConstant(am::Label label) {
     }
 }
 
+routine syncLabelNameAsInput(am::Label label) {
+    match {
+        val input = retrieve asem_d::Input corresponding to label
+    }
+    update {
+        input.name = label.name
+    }
+}
+
+routine syncLabelNameAsOutput(am::Label label) {
+    match {
+        val output = retrieve asem_d::Output corresponding to label
+    }
+    update {
+        output.name = label.name
+    }
+}
+
+routine syncLabelNameAsSystemConstant(am::Label label) {
+    match {
+        val systemConstant = retrieve asem_d::SystemConstant corresponding to label
+    }
+    update {
+        systemConstant.name = label.name
+    }
+}
+
 routine syncLabelName(am::Label label) {
     update {
         syncLabelNameAsMessage(label)
         syncLabelNameAsConstant(label)
+        syncLabelNameAsInput(label)
+        syncLabelNameAsOutput(label)
+        syncLabelNameAsSystemConstant(label)
     }
 }
 
-// P8 — Label.constant flipped false→true: replace Message with Constant
+// P8 — Label.constant flipped false→true: replace Message/Input/Output with
+// SystemConstant (if tagged) or Constant
 reaction LabelFlippedToConstant {
     after attribute replaced at am::Label[constant]
         with affectedEObject.constant == true
-    call swapMessageToConstant(affectedEObject)
+    call swapVariableToConstant(affectedEObject)
 }
+
+// NOTE: each swap routine below is self-gated by its own
+// `retrieve` of the OLD counterpart type (requires presence, not absence). This is
+// deliberate: a Label created directly with constant=true can trigger a spurious
+// synthesized "attribute replaced" event for [constant] (since the true value
+// differs from the false default, EMF/Vitruv change-recording can synthesize a
+// replace event even though the value was set before the object was tracked).
+// Without this presence-gate, that spurious event would create a SECOND, duplicate
+// Constant alongside the one E10 already created — confirmed via a real test
+// failure ("2 corresponding elements of type Constant") before this fix. Requiring
+// presence of a genuine prior Message/Input/Output (or Constant/SystemConstant)
+// means the swap only fires on a REAL flip, never on fresh creation.
 
 routine swapMessageToConstant(am::Label label) {
     match {
@@ -272,25 +479,94 @@ routine swapMessageToConstant(am::Label label) {
     }
     create {
         val newConstant = new asem_d::Constant
+        val newSystemConstant = new asem_d::SystemConstant
     }
     update {
         module.typedElements -= message
         removeObject(message)
         removeCorrespondenceBetween(label, message)
-        newConstant.name = label.name
-        module.typedElements += newConstant
-        addCorrespondenceBetween(label, newConstant)
+        val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
+        if (isSystemConstant) {
+            newSystemConstant.name = label.name
+            module.typedElements += newSystemConstant
+            addCorrespondenceBetween(label, newSystemConstant)
+        } else {
+            newConstant.name = label.name
+            module.typedElements += newConstant
+            addCorrespondenceBetween(label, newConstant)
+        }
     }
 }
 
-// P9 — Label.constant flipped true→false: replace Constant with Message
+routine swapInputToConstant(am::Label label) {
+    match {
+        val input  = retrieve asem_d::Input corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val newConstant = new asem_d::Constant
+        val newSystemConstant = new asem_d::SystemConstant
+    }
+    update {
+        module.typedElements -= input
+        removeObject(input)
+        removeCorrespondenceBetween(label, input)
+        val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
+        if (isSystemConstant) {
+            newSystemConstant.name = label.name
+            module.typedElements += newSystemConstant
+            addCorrespondenceBetween(label, newSystemConstant)
+        } else {
+            newConstant.name = label.name
+            module.typedElements += newConstant
+            addCorrespondenceBetween(label, newConstant)
+        }
+    }
+}
+
+routine swapOutputToConstant(am::Label label) {
+    match {
+        val output = retrieve asem_d::Output corresponding to label
+        val module = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val newConstant = new asem_d::Constant
+        val newSystemConstant = new asem_d::SystemConstant
+    }
+    update {
+        module.typedElements -= output
+        removeObject(output)
+        removeCorrespondenceBetween(label, output)
+        val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
+        if (isSystemConstant) {
+            newSystemConstant.name = label.name
+            module.typedElements += newSystemConstant
+            addCorrespondenceBetween(label, newSystemConstant)
+        } else {
+            newConstant.name = label.name
+            module.typedElements += newConstant
+            addCorrespondenceBetween(label, newConstant)
+        }
+    }
+}
+
+routine swapVariableToConstant(am::Label label) {
+    update {
+        swapMessageToConstant(label)
+        swapInputToConstant(label)
+        swapOutputToConstant(label)
+    }
+}
+
+// P9 — Label.constant flipped true→false: replace Constant/SystemConstant with Message
+// (Input/Output require a LabelAccess-driven resync — see LabelAccessCreated above)
 reaction LabelFlippedToVariable {
     after attribute replaced at am::Label[constant]
         with affectedEObject.constant == false
     call swapConstantToMessage(affectedEObject)
 }
 
-routine swapConstantToMessage(am::Label label) {
+routine swapConstantOnlyToMessage(am::Label label) {
     match {
         val constant = retrieve asem_d::Constant corresponding to label
         val module   = retrieve asem_c::Module corresponding to label.referringComponents.head
@@ -305,6 +581,31 @@ routine swapConstantToMessage(am::Label label) {
         newMessage.name = label.name
         module.typedElements += newMessage
         addCorrespondenceBetween(label, newMessage)
+    }
+}
+
+routine swapSystemConstantToMessage(am::Label label) {
+    match {
+        val systemConstant = retrieve asem_d::SystemConstant corresponding to label
+        val module         = retrieve asem_c::Module corresponding to label.referringComponents.head
+    }
+    create {
+        val newMessage = new asem_d::Message
+    }
+    update {
+        module.typedElements -= systemConstant
+        removeObject(systemConstant)
+        removeCorrespondenceBetween(label, systemConstant)
+        newMessage.name = label.name
+        module.typedElements += newMessage
+        addCorrespondenceBetween(label, newMessage)
+    }
+}
+
+routine swapConstantToMessage(am::Label label) {
+    update {
+        swapConstantOnlyToMessage(label)
+        swapSystemConstantToMessage(label)
     }
 }
 
@@ -477,5 +778,181 @@ routine createComposedTypeForArray(am::Array array) {
         // independent roots sharing one resource (persistAsRoot appends, not overwrites).
         persistProjectRelative(array, composedType, "asem/composedtypes.asem")
         addCorrespondenceBetween(array, composedType)
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 6 — Task/ISR ↔ Task/InterruptTask   (Rules 2 & 3)
+//
+// supervisor confirmed priority should be reached via a
+// tagged correspondence (Task <-> SchedulingParameter / ISRAllocation) rather than
+// copied into a new ASEM field. Only a single unified ASEM `Task` class is added
+// (not the documented 4-way Init/Software/TimeTable split) — nothing on AMALTHEA's
+// Task cleanly signals which of the three it should become; that split is left as
+// an explicit, documented gap rather than a guess.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Task created → create an ASEM Task
+reaction TaskCreated {
+    after element am::Task created
+    call createTaskForTask(affectedEObject)
+}
+
+routine createTaskForTask(am::Task task) {
+    match {
+        require absence of asem_c::Task corresponding to task
+    }
+    create {
+        val asemTask = new asem_c::Task
+    }
+    update {
+        asemTask.name = task.name
+        persistProjectRelative(task, asemTask, "asem/task_" + task.name + ".asem")
+        addCorrespondenceBetween(task, asemTask)
+    }
+}
+
+// ISR created → create an ASEM InterruptTask (Rule 3: unconditional 1:1)
+reaction ISRCreated {
+    after element am::ISR created
+    call createInterruptTaskForISR(affectedEObject)
+}
+
+routine createInterruptTaskForISR(am::ISR isr) {
+    match {
+        require absence of asem_c::InterruptTask corresponding to isr
+    }
+    create {
+        val interruptTask = new asem_c::InterruptTask
+    }
+    update {
+        interruptTask.name = isr.name
+        persistProjectRelative(isr, interruptTask, "asem/interrupttask_" + isr.name + ".asem")
+        addCorrespondenceBetween(isr, interruptTask)
+    }
+}
+
+// Task deleted → delete corresponding ASEM Task
+reaction TaskDeleted {
+    after element am::Task deleted
+    call deleteTaskForTask(affectedEObject)
+}
+
+routine deleteTaskForTask(am::Task task) {
+    match {
+        val asemTask = retrieve asem_c::Task corresponding to task
+    }
+    update {
+        removeObject(asemTask)
+        removeCorrespondenceBetween(task, asemTask)
+    }
+}
+
+// ISR deleted → delete corresponding ASEM InterruptTask
+reaction ISRDeleted {
+    after element am::ISR deleted
+    call deleteInterruptTaskForISR(affectedEObject)
+}
+
+routine deleteInterruptTaskForISR(am::ISR isr) {
+    match {
+        val interruptTask = retrieve asem_c::InterruptTask corresponding to isr
+    }
+    update {
+        removeObject(interruptTask)
+        removeCorrespondenceBetween(isr, interruptTask)
+    }
+}
+
+// Task.name changed → update ASEM Task.name
+reaction TaskRenamed {
+    after attribute replaced at am::Task[name]
+    call syncTaskNameToAsemTask(affectedEObject)
+}
+
+routine syncTaskNameToAsemTask(am::Task task) {
+    match {
+        val asemTask = retrieve asem_c::Task corresponding to task
+    }
+    update {
+        asemTask.name = task.name
+    }
+}
+
+// ISR.name changed → update ASEM InterruptTask.name
+reaction ISRRenamed {
+    after attribute replaced at am::ISR[name]
+    call syncISRNameToInterruptTask(affectedEObject)
+}
+
+routine syncISRNameToInterruptTask(am::ISR isr) {
+    match {
+        val interruptTask = retrieve asem_c::InterruptTask corresponding to isr
+    }
+    update {
+        interruptTask.name = isr.name
+    }
+}
+
+// RunnableCall created → append the called Method to the caller's Task.processes.
+// Relies on R4's Method correspondence already existing for the called Runnable, and
+// on this Task/ISR's own correspondence already existing — RunnableCalls are assumed
+// to be added after both the calling Task/ISR and the called Runnable exist, matching
+// how VSUMRunner's test helpers build models.
+reaction RunnableCallCreated {
+    after element am::RunnableCall created
+    call linkMethodToTaskProcesses(affectedEObject)
+}
+
+routine linkMethodToTaskProcesses(am::RunnableCall runnableCall) {
+    match {
+        val method = retrieve asem_d::Method corresponding to runnableCall.runnable
+        val task = retrieve asem_c::Task corresponding to runnableCall.containingExecutable
+    }
+    update {
+        task.processes += method
+    }
+}
+
+// Task priority — tagged correspondence, not a copied field (per supervisor direction).
+// Reacts on TaskAllocation creation (clean direct .task reference, no eContainer needed),
+// and looks for a scheduling parameter whose key mentions "priority". No canonical
+// SchedulingParameterDefinition naming convention was found in this project's
+// dependencies (searched project resources + the APP4MC jar), so this is a best-effort
+// name match; if none is found, no tagged correspondence is added — skipped, not guessed.
+// NOTE — SchedulingParameter itself is a java.util.Map$Entry, not an EObject (confirmed
+// by the compiler), so the correspondence targets its .value (a real Value EObject)
+// rather than the entry wrapper.
+reaction TaskAllocationCreated {
+    after element am::TaskAllocation created
+    call linkTaskPriorityCorrespondence(affectedEObject)
+}
+
+routine linkTaskPriorityCorrespondence(am::TaskAllocation taskAllocation) {
+    match {
+        val task = retrieve asem_c::Task corresponding to taskAllocation.task
+    }
+    update {
+        val priorityParam = taskAllocation.schedulingParameters.findFirst[
+            key !== null && key.name !== null && key.name.toLowerCase.contains("priority")]
+        if (priorityParam !== null && priorityParam.value !== null) {
+            addCorrespondenceBetween(task, priorityParam.value, "taskPriority")
+        }
+    }
+}
+
+// ISR priority — simpler than Task: ISRAllocation.priority is a plain int, no map lookup.
+reaction ISRAllocationCreated {
+    after element am::ISRAllocation created
+    call linkIsrPriorityCorrespondence(affectedEObject)
+}
+
+routine linkIsrPriorityCorrespondence(am::ISRAllocation isrAllocation) {
+    match {
+        val interruptTask = retrieve asem_c::InterruptTask corresponding to isrAllocation.isr
+    }
+    update {
+        addCorrespondenceBetween(interruptTask, isrAllocation, "isrPriority")
     }
 }

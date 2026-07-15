@@ -388,9 +388,9 @@ Context asem::classifiers::Module
 
 | AMALTHEA | ASEM |
 |---|---|
-| `Task.name` | `Method.name` |
-| Task priority (via `TaskAllocation`) | `Method` priority field |
-| `Task.activityGraph` → RunnableCalls **** | `Method.processes[]` |
+| `Task.name` | `Task.name` |
+| Task priority (via `TaskAllocation`) | reached via a tagged correspondence (`"taskPriority"`), not copied into ASEM |
+| `Task.activityGraph` → RunnableCalls **** | `Task.processes[]` |
 
 **Sub-constraint \*\*\* — processes must be void with no arguments**
 
@@ -400,10 +400,12 @@ Context Task
   Inv: self->collect(processes)->collect(arguments)->size()=0
 ```
 
-**Footnote \*\*\*\* — called runnables:** all `Runnable` instances reachable via the Task's `activityGraph.items` of type `RunnableCall`. These become entries in `Method.processes[]` (see section 4.2.3.1 of the paper).
+**Footnote \*\*\*\* — called runnables:** all `Runnable` instances reachable via the Task's `activityGraph.items` of type `RunnableCall`. These become entries in `Task.processes[]` (see section 4.2.3.1 of the paper).
 
 > [!NOTE]
-> Priority storage in AMALTHEA 3.3 is indirect — it lives as a `SchedulingParameter` on `TaskAllocation`, not a direct attribute of `Task`. Navigation: `MappingModel → taskAllocation → schedulingParameters`. Confirm approach with Benedikt before implementing.
+> Priority storage in AMALTHEA 3.3 is indirect — it lives as a `SchedulingParameter` on `TaskAllocation`, not a direct attribute of `Task`. Navigation: `MappingModel → taskAllocation → schedulingParameters`. Implemented as a second, tagged Vitruv correspondence (`Task ↔ SchedulingParameter`, tag `"taskPriority"`) rather than copying the value into a new ASEM field — the value is read live from AMALTHEA via the tag when needed.
+>
+> Only a single, unified ASEM `Task` class is implemented — `InitTask`/`SoftwareTask`/`TimeTableTask` are **not** implemented as separate subclasses. Nothing on AMALTHEA's `Task` (`preemption`, `multipleTaskActivationLimit`, `stimuli`) reliably signals which of the three it should become; this is a known, documented gap rather than a guess.
 
 #### Rule 3 — ISR ↔ InterruptTask
 
@@ -411,11 +413,11 @@ Context Task
 
 | AMALTHEA | ASEM |
 |---|---|
-| `ISR.name` | `Method.name` |
-| ISR priority (via `ISRAllocation`) | `Method` priority field |
-| `ISR.activityGraph` → RunnableCalls **** | `Method.processes[]` |
+| `ISR.name` | `InterruptTask.name` |
+| ISR priority (via `ISRAllocation`) | reached via a tagged correspondence (`"isrPriority"`), not copied into ASEM |
+| `ISR.activityGraph` → RunnableCalls **** | `InterruptTask.processes[]` (inherited from `Task`) |
 
-> The same sub-constraint \*\*\* and footnote \*\*\*\* from Rule 2 apply here without change.
+> The same sub-constraint \*\*\* and footnote \*\*\*\* from Rule 2 apply here without change. ISR priority is simpler than Task priority: `ISRAllocation.priority` is a plain int, not a map lookup, so the tagged correspondence points directly at the `ISRAllocation`.
 
 #### Rule 4 — Runnable ↔ Method
 
@@ -431,7 +433,7 @@ Context asem::dataexchange::Method
 
 > `RunnableParameter` instances in AMALTHEA do **not** propagate to ASEM `Method` parameters — the OCL constraint explicitly forbids parameters on the `Method` side.
 
-#### Rule 5 — Label (constant=true) ↔ Parameter / Constant / Systemconstant
+#### Rule 5 — Label (constant=true) ↔ Constant / Systemconstant
 
 ```ocl
 Context amalthea::Label
@@ -440,11 +442,13 @@ Context amalthea::Label
 
 | AMALTHEA | ASEM |
 |---|---|
-| `Label.name` | `Parameter.name` / `Constant.name` |
-| `Label.dataType` | `Parameter.type` / `Constant.type` (see Rules 7–9) |
+| `Label.name` | `Constant.name` / `SystemConstant.name` |
+| `Label.dataType` | `Constant.type` / `SystemConstant.type` (see Rules 7–9) |
 
-> [!WARNING]
-> `Systemconstant` from Table 5.1 does not appear as a named EClass in the provided ASEM ecore. It may be a `Constant` with a specific naming convention. Confirm with Benedikt.
+> [!NOTE]
+> `Parameter` was originally listed here (Table 5.1), but ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does. Treated as a documentation error rather than something to implement against; removed from this rule's target list.
+>
+> `SystemConstant` is implemented as a real, separate ASEM class (confirmed with the supervisor, no longer a "may be" guess). The discriminator: a constant=true `Label` carrying a `Tag` whose `name` or `tagType` is `"systemConstant"` (AMALTHEA's existing generic `ITaggable` mechanism) becomes a `SystemConstant`; otherwise it stays a plain `Constant`. This convention was chosen because no AMALTHEA field cleanly signals "system" vs. "plain" constant on its own, and the thesis figure (Table 5.1's original source) that might define the intended rule wasn't available.
 
 #### Rule 6 — Label (constant=false) ↔ Variable / Message / Argument / Input / Output
 
@@ -455,8 +459,14 @@ Context amalthea::Label
 
 | AMALTHEA | ASEM |
 |---|---|
-| `Label.name` | `Variable.name` / `Message.name` |
-| `Label.dataType` | `Variable.type` / `Message.type` |
+| `Label.name` | `Message.name` / `Input.name` / `Output.name` |
+| `Label.dataType` | `Message.type` / `Input.type` / `Output.type` |
+| `Label.labelAccesses[].access` | discriminates the target: read-only → `Input`, write-only → `Output`, mixed or not-yet-known → `Message` |
+
+> [!NOTE]
+> `Argument` is added to the ASEM ecore but **not wired** to any Label reaction — it structurally corresponds to AMALTHEA's `CallArgument` (tied to `RunnableCall.arguments`, a value passed at a specific call site), not to `Label` (a general data element). Wiring it into these rules would model the wrong relationship; it needs its own design pass keyed off `CallArgument` instead.
+>
+> The Input/Output split uses `Label.labelAccesses[].access` (`read`/`write`), an already-modeled AMALTHEA field. Since a `LabelAccess` is normally added *after* the `Label` it references, most Labels initially become `Message` at creation time and get retroactively swapped to `Input`/`Output` once a `LabelAccess` is added and the access pattern becomes unambiguous (read-only or write-only).
 
 > The Rule 1 sub-constraint \* further restricts this: within a `Module`, only `Message` instances (not plain `Variable`) correspond to `Label`s.
 
@@ -508,8 +518,7 @@ Context amalthea::BaseTypeDefinition
 | `Array.dataType` | `ComposedType.primitiveType` (element type) |
 
 > [!WARNING]
-> A dedicated `ArrayType` class is referenced in Table 5.1 but does not appear in the provided ASEM ecore. `ComposedType` with a `primitiveType` reference is the closest structural equivalent. Confirm with Benedikt.
-
+> A dedicated `ArrayType` class is referenced in Table 5.1 but does not appear in the provided ASEM ecore. `ComposedType` with a `primitiveType` reference is the closest structural equivalent.
 ### 3.3 OCL Invariant Summary
 
 ```ocl

@@ -4,14 +4,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
 
+import org.eclipse.app4mc.amalthea.model.Array;
+import org.eclipse.app4mc.amalthea.model.BaseTypeDefinition;
 import org.eclipse.app4mc.amalthea.model.Component;
+import org.eclipse.app4mc.amalthea.model.ISR;
 import org.eclipse.app4mc.amalthea.model.Label;
 import org.eclipse.app4mc.amalthea.model.Runnable;
 
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.Task;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Constant;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Message;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Method;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.BooleanType;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.ContinuousType;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.SignedDiscreteType;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.UnsignedDiscreteType;
 
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
@@ -256,5 +266,144 @@ public class AsemToAmaltheaTest {
 
         util.renameInAsem(vsum, "fromAmalthea", Method.class, "fromAsem");
         assertNotNull(util.getCorrespondingInAmalthea(vsum, "fromAsem", Runnable.class));
+    }
+
+    // ── R2 / R3 (reverse) — ASEM Task/InterruptTask → AMALTHEA Task/ISR ─────
+
+    @Test
+    @DisplayName("R2 (reverse) – ASEM Task created → AMALTHEA Task exists")
+    void r2_asemTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemTask(vsum, tempDir, "reverseTask");
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reverseTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task, "AMALTHEA Task must be created for the ASEM Task");
+        assertEquals("reverseTask", task.getName());
+    }
+
+    @Test
+    @DisplayName("R3 (reverse) – ASEM InterruptTask created → AMALTHEA ISR exists")
+    void r3_asemInterruptTaskCreated_isrCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemInterruptTask(vsum, tempDir, "reverseISR");
+
+        ISR isr = util.getCorrespondingInAmalthea(vsum, "reverseISR", ISR.class);
+        assertNotNull(isr, "AMALTHEA ISR must be created for the ASEM InterruptTask");
+        assertEquals("reverseISR", isr.getName());
+    }
+
+    // ── R5 / R6 (reverse) — Input/Output/SystemConstant → Label ──────────────
+
+    @Test
+    @DisplayName("R6 (reverse) – Input created → non-constant Label")
+    void r6_inputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addModule(vsum, tempDir, "SensorModule");
+        util.addInput(vsum, "SensorModule", "rawInput");
+
+        Label label = util.getCorrespondingInAmalthea(vsum, "rawInput", Label.class);
+        assertNotNull(label, "Label must be created for Input");
+        assertFalse(label.isConstant(), "Label.constant must be false");
+    }
+
+    @Test
+    @DisplayName("R6 (reverse) – Output created → non-constant Label")
+    void r6_outputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addModule(vsum, tempDir, "ActuatorModule");
+        util.addOutput(vsum, "ActuatorModule", "rawOutput");
+
+        Label label = util.getCorrespondingInAmalthea(vsum, "rawOutput", Label.class);
+        assertNotNull(label, "Label must be created for Output");
+        assertFalse(label.isConstant(), "Label.constant must be false");
+    }
+
+    @Test
+    @DisplayName("R5 (reverse) – SystemConstant created → constant Label")
+    void r5_systemConstantCreated_constantLabelCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addModule(vsum, tempDir, "CalibrationModule");
+        util.addSystemConstant(vsum, "CalibrationModule", "SYS_MAX");
+
+        Label label = util.getCorrespondingInAmalthea(vsum, "SYS_MAX", Label.class);
+        assertNotNull(label, "Label must be created for SystemConstant");
+        assertTrue(label.isConstant(), "Label.constant must be true");
+    }
+
+    // ── R7-R10 (reverse) — PrimitiveType/ComposedType → BaseTypeDefinition/Array ─
+
+    @Test
+    @DisplayName("R7 (reverse) – ASEM BooleanType created → BaseTypeDefinition size=1 bit")
+    void r7_asemBooleanTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemBooleanType(vsum, tempDir, "reverseBool");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseBool", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM BooleanType");
+        assertEquals(1, btd.getSize().getValue().intValue());
+    }
+
+    @Test
+    @DisplayName("R8 (reverse) – ASEM UnsignedDiscreteType created → BaseTypeDefinition size=32 bit")
+    void r8_asemUnsignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemUnsignedDiscreteType(vsum, tempDir, "reverseUint");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseUint", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM UnsignedDiscreteType");
+        assertEquals(32, btd.getSize().getValue().intValue());
+    }
+
+    @Test
+    @DisplayName("R8 (reverse) – ASEM SignedDiscreteType created → BaseTypeDefinition size=32 bit")
+    void r8_asemSignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemSignedDiscreteType(vsum, tempDir, "reverseSint");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseSint", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM SignedDiscreteType");
+        assertEquals(32, btd.getSize().getValue().intValue());
+    }
+
+    @Test
+    @DisplayName("R9 (reverse) – ASEM ContinuousType created → BaseTypeDefinition size=64 bit")
+    void r9_asemContinuousTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemContinuousType(vsum, tempDir, "reverseFloat");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseFloat", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM ContinuousType");
+        assertEquals(64, btd.getSize().getValue().intValue());
+    }
+
+    @Test
+    @DisplayName("R10 (reverse) – ASEM ComposedType created → Array exists")
+    void r10_asemComposedTypeCreated_arrayCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemComposedType(vsum, tempDir, "reverseComposed");
+
+        Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
+        assertNotNull(array, "Array must be created for the ASEM ComposedType");
     }
 }

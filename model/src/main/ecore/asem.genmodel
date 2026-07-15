@@ -32,6 +32,13 @@
       </genClasses>
       <genClasses ecoreClass="asem.ecore#//classifiers/Class"/>
       <genClasses ecoreClass="asem.ecore#//classifiers/Module"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/Task">
+        <genFeatures notify="false" createChild="false" propertySortChoices="true"
+            ecoreFeature="ecore:EReference asem.ecore#//classifiers/Task/processes"/>
+      </genClasses>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/InterruptTask"/>
     </nestedGenPackages>
     <nestedGenPackages prefix="Dataexchange" disposableProviderFactory="true" ecorePackage="asem.ecore#//dataexchange">
       <genClasses ecoreClass="asem.ecore#//dataexchange/Variable">
@@ -54,6 +61,14 @@
       <genClasses ecoreClass="asem.ecore#//dataexchange/Constant">
         <genFeatures createChild="false" ecoreFeature="ecore:EAttribute asem.ecore#//dataexchange/Constant/value"/>
       </genClasses>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//dataexchange/SystemConstant"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//dataexchange/Argument"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//dataexchange/Input"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//dataexchange/Output"/>
     </nestedGenPackages>
     <nestedGenPackages prefix="Primitivetypes" disposableProviderFactory="true" ecorePackage="asem.ecore#//primitivetypes">
       <genClasses ecoreClass="asem.ecore#//primitivetypes/PrimitiveType"/>

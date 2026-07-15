@@ -22,25 +22,36 @@ import org.eclipse.app4mc.amalthea.model.Component;
 import org.eclipse.app4mc.amalthea.model.DataSize;
 import org.eclipse.app4mc.amalthea.model.DataSizeUnit;
 import org.eclipse.app4mc.amalthea.model.DataTypeDefinition;
+import org.eclipse.app4mc.amalthea.model.IExecutable;
 import org.eclipse.app4mc.amalthea.model.Label;
+import org.eclipse.app4mc.amalthea.model.LabelAccess;
+import org.eclipse.app4mc.amalthea.model.LabelAccessEnum;
 import org.eclipse.app4mc.amalthea.model.Runnable;
+import org.eclipse.app4mc.amalthea.model.RunnableCall;
 import org.eclipse.app4mc.amalthea.model.SWModel;
+import org.eclipse.app4mc.amalthea.model.Tag;
 
 import edu.kit.ipd.sdq.metamodels.asem.AsemFactory;
 import edu.kit.ipd.sdq.metamodels.asem.Dummy;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Classifier;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.Task;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.impl.ClassifiersFactoryImpl;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Constant;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Input;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Message;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Method;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Output;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.ReturnType;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.SystemConstant;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.impl.DataexchangeFactoryImpl;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.BooleanType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.ContinuousType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.SignedDiscreteType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.UnsignedDiscreteType;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.impl.PrimitivetypesFactoryImpl;
 
 import tools.vitruv.change.propagation.ChangePropagationMode;
 import tools.vitruv.change.propagation.ChangePropagationSpecification;
@@ -173,11 +184,15 @@ public class VSUMRunner {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
-        // also check standalone Component/Runnable/Label roots directly (auto-created by
-        // AsemToAmalthea.reactions via persistProjectRelative, since none of them have a
-        // correspondence/containment path back to the Amalthea root's SWModel/ComponentsModel)
+        // also check standalone Component/Runnable/Label/Task/ISR/BaseTypeDefinition/Array
+        // roots directly (auto-created by AsemToAmalthea.reactions via persistProjectRelative,
+        // since none of them have a correspondence/containment path back to the Amalthea
+        // root's SWModel/ComponentsModel)
         for (EObject root : getDefaultView(vsum,
-                List.of(Component.class, Runnable.class, Label.class)).getRootObjects()) {
+                List.of(Component.class, Runnable.class, Label.class,
+                        org.eclipse.app4mc.amalthea.model.Task.class,
+                        org.eclipse.app4mc.amalthea.model.ISR.class,
+                        BaseTypeDefinition.class, Array.class)).getRootObjects()) {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
@@ -284,6 +299,100 @@ public class VSUMRunner {
         return name;
     }
 
+    public String addTask(VirtualModel vsum, String componentName, String taskName) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Component comp = findByNameAndType(
+                    getAmaltheaRoot(v), Component.class, componentName);
+            org.eclipse.app4mc.amalthea.model.Task task =
+                    AmaltheaFactory.eINSTANCE.createTask();
+            task.setName(taskName);
+            getAmaltheaRoot(v).getSwModel().getTasks().add(task);
+            comp.getProcesses().add(task);
+        });
+        return taskName;
+    }
+
+    public String addISR(VirtualModel vsum, String componentName, String isrName) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Component comp = findByNameAndType(
+                    getAmaltheaRoot(v), Component.class, componentName);
+            org.eclipse.app4mc.amalthea.model.ISR isr =
+                    AmaltheaFactory.eINSTANCE.createISR();
+            isr.setName(isrName);
+            getAmaltheaRoot(v).getSwModel().getIsrs().add(isr);
+            comp.getProcesses().add(isr);
+        });
+        return isrName;
+    }
+
+    /** Adds a RunnableCall to a Task's or ISR's activityGraph, calling the given Runnable. */
+    public void addRunnableCall(VirtualModel vsum, String callerName, String calleeRunnableName) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            IExecutable caller = findByNameAndType(
+                    getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.Task.class, callerName);
+            if (caller == null) {
+                caller = findByNameAndType(
+                        getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.ISR.class, callerName);
+            }
+            Runnable callee = findByNameAndType(
+                    getAmaltheaRoot(v), Runnable.class, calleeRunnableName);
+            if (caller.getActivityGraph() == null) {
+                caller.setActivityGraph(AmaltheaFactory.eINSTANCE.createActivityGraph());
+            }
+            RunnableCall call = AmaltheaFactory.eINSTANCE.createRunnableCall();
+            call.setRunnable(callee);
+            caller.getActivityGraph().getItems().add(call);
+        });
+    }
+
+    /** Adds a LabelAccess (read or write) from a Runnable to a Label. */
+    public void addLabelAccess(VirtualModel vsum, String runnableName, String labelName, boolean isRead) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Runnable runnable = findByNameAndType(
+                    getAmaltheaRoot(v), Runnable.class, runnableName);
+            Label label = findByNameAndType(
+                    getAmaltheaRoot(v), Label.class, labelName);
+            if (runnable.getActivityGraph() == null) {
+                runnable.setActivityGraph(AmaltheaFactory.eINSTANCE.createActivityGraph());
+            }
+            LabelAccess access = AmaltheaFactory.eINSTANCE.createLabelAccess();
+            access.setData(label);
+            access.setAccess(isRead ? LabelAccessEnum.READ : LabelAccessEnum.WRITE);
+            runnable.getActivityGraph().getItems().add(access);
+        });
+    }
+
+    /**
+     * Creates a constant=true Label already tagged "systemConstant" in a single transaction.
+     * The tag must be present BEFORE the Label is first tracked, since the SystemConstant
+     * discriminator reacts on Label creation, not on a later Tag addition — creating first
+     * and tagging afterward (as two separate commits) would create a plain Constant first.
+     */
+    public String addSystemConstantTaggedLabel(VirtualModel vsum, String componentName, String labelName) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Amalthea root = getAmaltheaRoot(v);
+            if (root.getCommonElements() == null) {
+                root.setCommonElements(AmaltheaFactory.eINSTANCE.createCommonElements());
+            }
+            Component comp = findByNameAndType(root, Component.class, componentName);
+            Label label = AmaltheaFactory.eINSTANCE.createLabel();
+            label.setName(labelName);
+            label.setConstant(true);
+            Tag tag = AmaltheaFactory.eINSTANCE.createTag();
+            tag.setName("systemConstant");
+            root.getCommonElements().getTags().add(tag);
+            label.getTags().add(tag);
+            root.getSwModel().getLabels().add(label);
+            comp.getLabels().add(label);
+        });
+        return labelName;
+    }
+
     public void renameInAmalthea(VirtualModel vsum, String oldName,
                                    Class<? extends EObject> type, String newName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -356,6 +465,124 @@ public class VSUMRunner {
             module.getMethods().add(method);
         });
         return methodName;
+    }
+
+    public String addInput(VirtualModel vsum, String moduleName, String inputName) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Module module = findModuleInView(v, moduleName);
+            Input input = DataexchangeFactoryImpl.eINSTANCE.createInput();
+            input.setName(inputName);
+            module.getTypedElements().add(input);
+        });
+        return inputName;
+    }
+
+    public String addOutput(VirtualModel vsum, String moduleName, String outputName) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Module module = findModuleInView(v, moduleName);
+            Output output = DataexchangeFactoryImpl.eINSTANCE.createOutput();
+            output.setName(outputName);
+            module.getTypedElements().add(output);
+        });
+        return outputName;
+    }
+
+    public String addSystemConstant(VirtualModel vsum, String moduleName, String constantName) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Module module = findModuleInView(v, moduleName);
+            SystemConstant sc = DataexchangeFactoryImpl.eINSTANCE.createSystemConstant();
+            sc.setName(constantName);
+            module.getTypedElements().add(sc);
+        });
+        return constantName;
+    }
+
+    /** Registers an ASEM Task as its own root — mirrors addModule, since ASEM has no container class. */
+    public String addAsemTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Task task = ClassifiersFactoryImpl.eINSTANCE.createTask();
+            task.setName(name);
+            v.registerRoot(task,
+                    URI.createFileURI(filePath.toString() + "/asem_task_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemInterruptTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            InterruptTask interruptTask = ClassifiersFactoryImpl.eINSTANCE.createInterruptTask();
+            interruptTask.setName(name);
+            v.registerRoot(interruptTask,
+                    URI.createFileURI(filePath.toString() + "/asem_interrupttask_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemBooleanType(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            BooleanType type = PrimitivetypesFactoryImpl.eINSTANCE.createBooleanType();
+            type.setName(name);
+            v.registerRoot(type,
+                    URI.createFileURI(filePath.toString() + "/asem_type_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemUnsignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            UnsignedDiscreteType type = PrimitivetypesFactoryImpl.eINSTANCE.createUnsignedDiscreteType();
+            type.setName(name);
+            v.registerRoot(type,
+                    URI.createFileURI(filePath.toString() + "/asem_type_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemSignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            SignedDiscreteType type = PrimitivetypesFactoryImpl.eINSTANCE.createSignedDiscreteType();
+            type.setName(name);
+            v.registerRoot(type,
+                    URI.createFileURI(filePath.toString() + "/asem_type_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemContinuousType(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            ContinuousType type = PrimitivetypesFactoryImpl.eINSTANCE.createContinuousType();
+            type.setName(name);
+            v.registerRoot(type,
+                    URI.createFileURI(filePath.toString() + "/asem_type_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemComposedType(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            ComposedType composedType = ClassifiersFactoryImpl.eINSTANCE.createComposedType();
+            composedType.setName(name);
+            v.registerRoot(composedType,
+                    URI.createFileURI(filePath.toString() + "/asem_composedtype_" + name + ".asem"));
+        });
+        return name;
     }
 
     public String addMessage(VirtualModel vsum, String moduleName,
