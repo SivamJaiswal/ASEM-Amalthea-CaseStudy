@@ -4,9 +4,11 @@ import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
 
 // Change propagation: AMALTHEA (APP4MC 3.3.0) --> ASEM (KIT)
-// Existence rules  : E1, E2, E5, E6, E9, E10, E11, E14, E15, E16, E17
-// Property rules   : P1, P3, P5, P8, P9, P11
-// Structural rules : S5, S6
+// Existence rules  : E1, E2, E5, E6, E9(a/b/c), E10(a/b), E11, E14, E15, E16, E17,
+//                    E18, E19, E20, E21, E33
+// Property rules   : P1, P3, P5, P8, P9, P11, P13, P14, P18, P19
+// Structural rules : S5, S6 (absorbed into E9/E10/E11 — see SECTION 3), S9, S10
+// See README.md §3.4 for the full rule table this maps onto.
 // Correspondences are created here; AsemToAmalthea.reactions only looks them up.
 
 // NOTE — segment name must start with lowercase (Reactions DSL requirement)
@@ -15,9 +17,8 @@ in reaction to changes in am
 execute actions in asem_c
 
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1 — Component ↔ Module   (Rule 1 / E1, E2, P1)
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // E1 — Component created → create a Module with the same name
 reaction ComponentCreated {
@@ -74,19 +75,10 @@ routine syncComponentNameToModule(am::Component component) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 2 — Runnable ↔ Method   (Rule 4 / E5, E6, P3)
-//
-// OCL invariants from Table 5.1 — enforced structurally at creation time:
 //   self.returnType.oclIsUndefined()   → returnType is never set
 //   self.parameters->size() = 0        → parameters list is never populated
-//
-// NOTE — S1/S2 (Runnable inserted/removed in Component.runnables) are NOT
-// implemented as separate reactions. The Reactions DSL fires ElementInserted
-// and ElementDeleted reactions for containment changes, which already cover
-// the E5/E6 reactions above. Adding separate S1/S2 reactions would cause
-// duplicate Method creation. S1/S2 are therefore satisfied by E5/E6.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // E5 — Runnable created → create a void no-param Method in the parent Module
 reaction RunnableCreated {
@@ -143,20 +135,13 @@ routine syncRunnableNameToMethod(am::Runnable runnable) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION 3 — Label ↔ Message / Constant   (Rules 5 & 6 / E9–E11, P5, P8, P9, S5, S6)
+
+// SECTION 3 — Label ↔ Message / Constant   
 //
 // Label constant=false → Message   (Rule 6)
 // Label constant=true  → Constant  (Rule 5)
-// ─────────────────────────────────────────────────────────────────────────────
 
-// E9 split three ways using Label.labelAccesses[].access
-// (read/write), an already-modeled AMALTHEA field, instead of always creating a
-// Message. Read-only accessors -> Input, write-only -> Output, mixed/no accesses
-// yet -> Message (unchanged fallback). LabelAccess is normally added AFTER the
-// Label itself, so most Labels land in the Message fallback at creation time —
-// see LabelAccessCreated below, which retroactively swaps Message -> Input/Output
-// once the access pattern becomes known.
+
 
 // E9a — non-constant Label, read-only accesses → Input
 reaction InputLabelCreated {
@@ -231,10 +216,7 @@ routine createMessageForLabel(am::Label label) {
     }
 }
 
-// LabelAccess created after the Label it references: retroactively
-// swap the Label's ASEM counterpart from Message to Input/Output once the read/write
-// pattern becomes known. Only acts if the Label is currently represented as a Message
-// (i.e. was created before its access pattern was known); does nothing otherwise.
+
 reaction LabelAccessCreated {
     after element am::LabelAccess created
         with affectedEObject.data !== null
@@ -274,10 +256,6 @@ routine resyncLabelVariableKind(am::LabelAccess labelAccess) {
     }
 }
 
-// SystemConstant discriminator: a constant=true Label carrying
-// a Tag named/typed "systemConstant" (AMALTHEA's existing generic tagging mechanism,
-// via ITaggable) becomes a SystemConstant instead of a plain Constant. No new field
-// needed, no guessing at the unavailable thesis figure.
 
 // E10a — constant Label tagged "systemConstant" → SystemConstant
 reaction SystemConstantLabelCreated {
@@ -453,24 +431,12 @@ routine syncLabelName(am::Label label) {
 }
 
 // P8 — Label.constant flipped false→true: replace Message/Input/Output with
-// SystemConstant (if tagged) or Constant
 reaction LabelFlippedToConstant {
     after attribute replaced at am::Label[constant]
         with affectedEObject.constant == true
     call swapVariableToConstant(affectedEObject)
 }
 
-// NOTE: each swap routine below is self-gated by its own
-// `retrieve` of the OLD counterpart type (requires presence, not absence). This is
-// deliberate: a Label created directly with constant=true can trigger a spurious
-// synthesized "attribute replaced" event for [constant] (since the true value
-// differs from the false default, EMF/Vitruv change-recording can synthesize a
-// replace event even though the value was set before the object was tracked).
-// Without this presence-gate, that spurious event would create a SECOND, duplicate
-// Constant alongside the one E10 already created — confirmed via a real test
-// failure ("2 corresponding elements of type Constant") before this fix. Requiring
-// presence of a genuine prior Message/Input/Output (or Constant/SystemConstant)
-// means the swap only fires on a REAL flip, never on fresh creation.
 
 routine swapMessageToConstant(am::Label label) {
     match {
@@ -559,7 +525,6 @@ routine swapVariableToConstant(am::Label label) {
 }
 
 // P9 — Label.constant flipped true→false: replace Constant/SystemConstant with Message
-// (Input/Output require a LabelAccess-driven resync — see LabelAccessCreated above)
 reaction LabelFlippedToVariable {
     after attribute replaced at am::Label[constant]
         with affectedEObject.constant == false
@@ -609,29 +574,12 @@ routine swapConstantToMessage(am::Label label) {
     }
 }
 
-// S5/S6 — Label inserted/removed in Component.labels
-// NOTE — these are already covered by E9/E10/E11 (ElementCreated/Deleted reactions).
-// Separate structural reactions for inserted/removed cannot use a `with` guard
-// because affectedEObject in that context is the container (Component), not the
-// inserted Label. Removed to avoid duplicate creation and type errors.
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION 4 — BaseTypeDefinition ↔ PrimitiveType   (Rules 7–9 / E14–E16, P11)
-//
-// size = 1           → BooleanType             (Rule 7)
-// size in {8,16,32}  → Unsigned/SignedDiscrete  (Rule 8)
-// size in {32,64}    → ContinuousType           (Rule 9)
+// SECTION 4 — BaseTypeDefinition ↔ PrimitiveType  
 //
 // Overlap at size=32: alias containing "float" or "double" → ContinuousType,
 // otherwise → DiscreteType.
-//
-// NOTE on DSL constraints:
-//   - Elvis operator ?: is not valid in Reactions DSL update blocks
-//   - String.valueOf is not available; use literal concatenation or intValue
-//   - Lambda exists[] with two conditions requires explicit typing
-//   - after reference replaced is not valid; use after attribute replaced
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // E14 — size=1 → BooleanType
 reaction BooleanBaseTypeCreated {
@@ -652,6 +600,7 @@ routine createBooleanType(am::BaseTypeDefinition btd) {
         boolType.name = btd.name
         persistProjectRelative(btd, boolType, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, boolType)
+        addCorrespondenceBetween(btd.size, btd, "dataSizeOwner")
     }
 }
 
@@ -678,6 +627,7 @@ routine createUnsignedDiscreteType(am::BaseTypeDefinition btd) {
         ud.name = btd.name
         persistProjectRelative(btd, ud, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, ud)
+        addCorrespondenceBetween(btd.size, btd, "dataSizeOwner")
     }
 }
 
@@ -692,6 +642,7 @@ routine createSignedDiscreteType(am::BaseTypeDefinition btd) {
         sd.name = btd.name
         persistProjectRelative(btd, sd, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, sd)
+        addCorrespondenceBetween(btd.size, btd, "dataSizeOwner")
     }
 }
 
@@ -728,32 +679,97 @@ routine createContinuousType(am::BaseTypeDefinition btd) {
         contType.name = btd.name
         persistProjectRelative(btd, contType, "asem/type_" + btd.name + ".asem")
         addCorrespondenceBetween(btd, contType)
+        addCorrespondenceBetween(btd.size, btd, "dataSizeOwner")
     }
 }
 
-// NOTE on P11 (BaseTypeDefinition.size changed → remove old primitive, create new one):
-//   BaseTypeDefinition.size is a contained DataSize object (EReference, not EAttribute), so
-//   "after attribute replaced" can't listen on it directly, and eContainer/instanceof
-//   navigation from DataSize isn't supported in update blocks either. The only event the DSL
-//   can listen on is "after element am::BaseTypeDefinition created" — but that event fires
-//   identically for a genuinely first-time creation and for a delete+recreate, and the DSL
-//   gives no way to distinguish the two from within the reaction. An earlier implementation
-//   here registered an unconditional reaction on that same event to clean up "the old
-//   primitive" — but since it fires in the same batch as (and after) E14/E15/E16's guarded
-//   creation reactions, it ended up deleting the primitive type those reactions had just
-//   created moments earlier, breaking every first-time creation. P11 is therefore omitted
-//   from this file; a custom Java propagation spec would be needed to implement it correctly.
+// P11 (BaseTypeDefinition.size changed → remove old primitive, create new one):
+routine dispatchPrimitiveTypeCreation(am::BaseTypeDefinition btd) {
+    update {
+        if (btd.size !== null && btd.size.value.intValue == 1) {
+            createBooleanType(btd)
+        } else if (btd.size !== null
+                && (   btd.size.value.intValue == 8
+                    || btd.size.value.intValue == 16
+                    || btd.size.value.intValue == 32)
+                && btd.aliases.exists[alias.toLowerCase.contains("float") == false
+                                   && alias.toLowerCase.contains("double") == false]) {
+            createDiscreteType(btd)
+        } else if (btd.size !== null
+                && (btd.size.value.intValue == 32 || btd.size.value.intValue == 64)
+                && btd.aliases.exists[alias.toLowerCase.contains("float")
+                                   || alias.toLowerCase.contains("double")]) {
+            createContinuousType(btd)
+        }
+    }
+}
+
+reaction BaseTypeSizeChanged {
+    after attribute replaced at am::DataSize[value]
+    call resizeBaseType(affectedEObject)
+}
+
+routine resizeBaseType(am::DataSize size) {
+    match {
+        val btd = retrieve am::BaseTypeDefinition corresponding to size
+        val oldPrimitiveType = retrieve asem_p::PrimitiveType corresponding to btd
+    }
+    update {
+        val boolean sizeIsOne = btd.size !== null && btd.size.value.intValue == 1
+        val boolean sizeIsDiscrete = btd.size !== null
+            && (   btd.size.value.intValue == 8
+                || btd.size.value.intValue == 16
+                || btd.size.value.intValue == 32)
+            && btd.aliases.exists[alias.toLowerCase.contains("float") == false
+                               && alias.toLowerCase.contains("double") == false]
+        val boolean sizeIsContinuous = btd.size !== null
+            && (btd.size.value.intValue == 32 || btd.size.value.intValue == 64)
+            && btd.aliases.exists[alias.toLowerCase.contains("float")
+                               || alias.toLowerCase.contains("double")]
+        // "instanceof asem_p::X" doesn't parse in this DSL (the Package::Type alias syntax
+        // isn't accepted in instanceof position, only after "new") — compare EClass names
+        // instead, which sidesteps the parsing issue entirely.
+        val String oldTypeName = oldPrimitiveType.eClass.name
+        val boolean alreadyCorrect =
+            (sizeIsOne && oldTypeName == "BooleanType")
+            || (sizeIsDiscrete && (oldTypeName == "UnsignedDiscreteType" || oldTypeName == "SignedDiscreteType"))
+            || (sizeIsContinuous && oldTypeName == "ContinuousType")
+
+        if (alreadyCorrect == false) {
+            removeCorrespondenceBetween(btd, oldPrimitiveType)
+            removeObject(oldPrimitiveType)
+            dispatchPrimitiveTypeCreation(btd)
+        }
+    }
+}
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION 5 — Array ↔ ComposedType   (Rule 10 / E17)
-//
-// NOTE on P12 (Array.numberElements changed):
-//   ComposedType in the provided ASEM ecore has no customProperties field
-//   and no dedicated size attribute. P12 cannot be implemented without
-//   either a size field on ComposedType or a workaround agreed with Benedikt.
-//   The P12 reaction is therefore omitted from this file.
-// ─────────────────────────────────────────────────────────────────────────────
+
+// SECTION 4b — SWModel ↔ PrimitiveTypeRepository   (new correspondence, not part of R1–R10)
+
+
+reaction SWModelCreated {
+    after element am::SWModel created
+    call createPrimitiveTypeRepositoryForSWModel(affectedEObject)
+}
+
+routine createPrimitiveTypeRepositoryForSWModel(am::SWModel swModel) {
+    match {
+        require absence of asem_p::PrimitiveTypeRepository corresponding to swModel
+    }
+    create {
+        val repo = new asem_p::PrimitiveTypeRepository
+    }
+    update {
+        repo.name = "PrimitiveTypes"
+        persistProjectRelative(swModel, repo, "asem/primitivetyperepository.asem")
+        addCorrespondenceBetween(swModel, repo)
+    }
+}
+
+
+// SECTION 5 — Array ↔ ComposedType   (Rule 10 / E17, P12)
+
 
 // E17 — Array created → create a ComposedType
 reaction ArrayCreated {
@@ -773,6 +789,7 @@ routine createComposedTypeForArray(am::Array array) {
         // because eContainer access in update blocks is not supported in this DSL version
         // Array has no name attribute in AMALTHEA — name is set from the test/caller
         composedType.name = "ComposedType"
+        composedType.numberElements = array.numberElements
         // Array has no name attribute to key a per-object file on, and Dummy has no
         // containment feature for ComposedTypes, so all of them are persisted as
         // independent roots sharing one resource (persistAsRoot appends, not overwrites).
@@ -781,19 +798,26 @@ routine createComposedTypeForArray(am::Array array) {
     }
 }
 
+// P12 — Array.numberElements changed → keep the corresponding ComposedType in sync
+reaction ArrayNumberElementsChanged {
+    after attribute replaced at am::Array[numberElements]
+    call syncArrayNumberElementsToComposedType(affectedEObject)
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
+routine syncArrayNumberElementsToComposedType(am::Array array) {
+    match {
+        val composedType = retrieve asem_c::ComposedType corresponding to array
+    }
+    update {
+        composedType.numberElements = array.numberElements
+    }
+}
+
+
 // SECTION 6 — Task/ISR ↔ Task/InterruptTask   (Rules 2 & 3)
-//
-// supervisor confirmed priority should be reached via a
-// tagged correspondence (Task <-> SchedulingParameter / ISRAllocation) rather than
-// copied into a new ASEM field. Only a single unified ASEM `Task` class is added
-// (not the documented 4-way Init/Software/TimeTable split) — nothing on AMALTHEA's
-// Task cleanly signals which of the three it should become; that split is left as
-// an explicit, documented gap rather than a guess.
-// ─────────────────────────────────────────────────────────────────────────────
 
-// Task created → create an ASEM Task
+
+// Task created → ask which ASEM Task subtype it should become, then create it
 reaction TaskCreated {
     after element am::Task created
     call createTaskForTask(affectedEObject)
@@ -803,8 +827,59 @@ routine createTaskForTask(am::Task task) {
     match {
         require absence of asem_c::Task corresponding to task
     }
+    update {
+        val String userMsg = "A Task '" + task.name + "' was created in AMALTHEA. " +
+            "AMALTHEA has only one Task type, but ASEM distinguishes several kinds. " +
+            "Which ASEM Task subtype should be created for it?"
+        val String[] selections = #["InitTask", "SoftwareTask", "PeriodicTask", "TimeTableTask"]
+        val selected = userInteractor.singleSelectionDialogBuilder.message(userMsg).choices(selections).windowModality(
+            tools.vitruv.change.interaction.UserInteractionOptions.WindowModality.MODAL).startInteraction()
+        switch (selected) {
+            case 0: createInitTaskForTask(task)
+            case 1: createSoftwareTaskForTask(task)
+            case 2: createPeriodicTaskForTask(task)
+            case 3: createTimeTableTaskForTask(task)
+            default: createSoftwareTaskForTask(task)
+        }
+    }
+}
+
+routine createInitTaskForTask(am::Task task) {
     create {
-        val asemTask = new asem_c::Task
+        val asemTask = new asem_c::InitTask
+    }
+    update {
+        asemTask.name = task.name
+        persistProjectRelative(task, asemTask, "asem/task_" + task.name + ".asem")
+        addCorrespondenceBetween(task, asemTask)
+    }
+}
+
+routine createSoftwareTaskForTask(am::Task task) {
+    create {
+        val asemTask = new asem_c::SoftwareTask
+    }
+    update {
+        asemTask.name = task.name
+        persistProjectRelative(task, asemTask, "asem/task_" + task.name + ".asem")
+        addCorrespondenceBetween(task, asemTask)
+    }
+}
+
+routine createPeriodicTaskForTask(am::Task task) {
+    create {
+        val asemTask = new asem_c::PeriodicTask
+    }
+    update {
+        asemTask.name = task.name
+        persistProjectRelative(task, asemTask, "asem/task_" + task.name + ".asem")
+        addCorrespondenceBetween(task, asemTask)
+    }
+}
+
+routine createTimeTableTaskForTask(am::Task task) {
+    create {
+        val asemTask = new asem_c::TimeTableTask
     }
     update {
         asemTask.name = task.name
@@ -896,10 +971,7 @@ routine syncISRNameToInterruptTask(am::ISR isr) {
 }
 
 // RunnableCall created → append the called Method to the caller's Task.processes.
-// Relies on R4's Method correspondence already existing for the called Runnable, and
-// on this Task/ISR's own correspondence already existing — RunnableCalls are assumed
-// to be added after both the calling Task/ISR and the called Runnable exist, matching
-// how VSUMRunner's test helpers build models.
+
 reaction RunnableCallCreated {
     after element am::RunnableCall created
     call linkMethodToTaskProcesses(affectedEObject)
@@ -915,15 +987,6 @@ routine linkMethodToTaskProcesses(am::RunnableCall runnableCall) {
     }
 }
 
-// Task priority — tagged correspondence, not a copied field (per supervisor direction).
-// Reacts on TaskAllocation creation (clean direct .task reference, no eContainer needed),
-// and looks for a scheduling parameter whose key mentions "priority". No canonical
-// SchedulingParameterDefinition naming convention was found in this project's
-// dependencies (searched project resources + the APP4MC jar), so this is a best-effort
-// name match; if none is found, no tagged correspondence is added — skipped, not guessed.
-// NOTE — SchedulingParameter itself is a java.util.Map$Entry, not an EObject (confirmed
-// by the compiler), so the correspondence targets its .value (a real Value EObject)
-// rather than the entry wrapper.
 reaction TaskAllocationCreated {
     after element am::TaskAllocation created
     call linkTaskPriorityCorrespondence(affectedEObject)
@@ -954,5 +1017,42 @@ routine linkIsrPriorityCorrespondence(am::ISRAllocation isrAllocation) {
     }
     update {
         addCorrespondenceBetween(interruptTask, isrAllocation, "isrPriority")
+    }
+}
+
+// PeriodicTask.period/delay <-> PeriodicStimulus.recurrence/offset.
+reaction PeriodicStimulusAddedToTask {
+    after element am::PeriodicStimulus inserted in am::Task[stimuli]
+    call syncPeriodicTaskTiming(affectedEObject, newValue)
+}
+
+routine syncPeriodicTaskTiming(am::Task task, am::PeriodicStimulus stimulus) {
+    match {
+        val periodicTask = retrieve asem_c::PeriodicTask corresponding to task
+    }
+    update {
+        if (stimulus.recurrence.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.S) {
+            periodicTask.period = stimulus.recurrence.value.intValue * 1000
+        } else if (stimulus.recurrence.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.US) {
+            periodicTask.period = stimulus.recurrence.value.intValue / 1000
+        } else if (stimulus.recurrence.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.NS) {
+            periodicTask.period = stimulus.recurrence.value.intValue / 1000000
+        } else if (stimulus.recurrence.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.PS) {
+            periodicTask.period = stimulus.recurrence.value.intValue / 1000000000
+        } else {
+            // MS, or an unrecognized unit — treat as already-milliseconds
+            periodicTask.period = stimulus.recurrence.value.intValue
+        }
+        if (stimulus.offset.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.S) {
+            periodicTask.delay = stimulus.offset.value.intValue * 1000
+        } else if (stimulus.offset.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.US) {
+            periodicTask.delay = stimulus.offset.value.intValue / 1000
+        } else if (stimulus.offset.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.NS) {
+            periodicTask.delay = stimulus.offset.value.intValue / 1000000
+        } else if (stimulus.offset.unit == org.eclipse.app4mc.amalthea.model.TimeUnit.PS) {
+            periodicTask.delay = stimulus.offset.value.intValue / 1000000000
+        } else {
+            periodicTask.delay = stimulus.offset.value.intValue
+        }
     }
 }

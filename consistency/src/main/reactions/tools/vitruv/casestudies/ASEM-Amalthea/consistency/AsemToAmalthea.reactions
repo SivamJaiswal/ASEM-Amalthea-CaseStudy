@@ -5,26 +5,23 @@ import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
 
 // Change propagation: ASEM (KIT) --> AMALTHEA (APP4MC 3.3.0)
-// Existence rules  : E3, E4, E7, E8, E12, E13, E14, E15, E16, E17
-// Property rules   : P2, P4, P6, P7
-// Structural rules : S3, S4, S7, S8
+// Existence rules  : E3, E4, E7, E8, E12, E13, E14, E15, E16, E17,
+//                    E22, E23, E24, E25, E26, E27, E28, E29, E30, E31, E32
+// Property rules   : P2, P4, P6, P7, P12, P15, P16, P17
+// Structural rules : S3, S4, S7, S8 (absorbed into E7/E12/E13 — see SECTION 2/3)
+// See README.md §3.4 for the full rule table this maps onto.
 // Correspondences are NOT created here — looked up from amaltheaToAsem.
 
 // NOTE — segment name must start with lowercase (Reactions DSL requirement)
-// NOTE — the trigger source below must be the ROOT asem package, not a sub-package
-// (asem_c/asem_d/etc.): asem.ecore nests classifiers/dataexchange/primitivetypes/base as
-// eSubpackages of one root "asem" package, and Vitruv's change-descriptor computation walks
-// any change up to the TOP-MOST enclosing EPackage. Declaring "asem_c" here meant this whole
-// reaction segment's registered source descriptor never matched any real ASEM-side change,
-// so it silently never fired for any Module/Method/Message/Constant change.
+
 reactions: asemToAmalthea
 in reaction to changes in asem
 execute actions in am
 
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // SECTION 1 — Module ↔ Component   (Rule 1 / E3, E4, P2)
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // E3 — Module created → create a Component
 reaction ModuleCreated {
@@ -81,16 +78,10 @@ routine syncModuleNameToComponent(asem_c::Module module) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 2 — Method ↔ Runnable   (Rule 4 / E7, E8, P4)
-//
 // Only Methods satisfying the Rule 4 OCL invariants trigger a Runnable:
 //   returnType must be null
 //   parameters list must be empty
-//
-// NOTE — S3/S4 (Method inserted/removed in Module.methods) are handled
-// by E7/E8 above since containment changes fire ElementCreated/Deleted.
-// ─────────────────────────────────────────────────────────────────────────────
 
 // E7 — void no-param Method created → create a Runnable
 reaction VoidMethodCreated {
@@ -153,13 +144,10 @@ routine syncMethodNameToRunnable(asem_d::Method method) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // SECTION 3 — Message ↔ Label (constant=false) / Constant ↔ Label (constant=true)
 //             (Rules 5 & 6 / E12, E13, P6, P7)
-//
-// NOTE — S7/S8 (Message/Constant inserted in Module.typedElements) are
-// handled by E12/E13 above since containment changes fire ElementCreated.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // E12 — Message created → create a non-constant Label
 reaction MessageCreated {
@@ -243,11 +231,6 @@ routine syncConstantNameToLabel(asem_d::Constant constant) {
     }
 }
 
-// Input/Output/SystemConstant reverse direction, mirroring
-// Message/Constant exactly (both simply set label.constant, same as Message's reverse
-// reaction; reactions fire on exact declared type, so these don't double-fire the
-// Message/Constant reactions above even though Input/Output extend Variable and
-// SystemConstant extends Constant).
 
 // Input created → create a non-constant Label
 reaction InputCreated {
@@ -364,20 +347,12 @@ routine syncSystemConstantNameToLabel(asem_d::SystemConstant systemConstant) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4 — PrimitiveType -> BaseTypeDefinition (Rules 7-9, reverse of E14-E16)
 //             ComposedType -> Array (Rule 10, reverse of E17)
-//
-// reverse direction for R7-R10, added per supervisor
-// direction ("Add the direction ASEM -> Amalthea"). Sizes are hardcoded to the
-// maximum valid value for each rule's own OCL bound (1/32/32/64 bits), per
-// supervisor's "set the maximum valid size" suggestion, since none of ASEM's
-// primitive types store a size themselves.
-//
-// NOTE — P12 (Array.numberElements <-> ComposedType) is explicitly OUT OF SCOPE
-// here: ComposedType has no matching size field, and adding one is P12's job,
-// not R10's. The Array created below is left at numberElements default (0).
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+// P12 — Array.numberElements <-> ComposedType.numberElements
+
 
 // E14 reverse — BooleanType created -> BaseTypeDefinition (size=1 bit)
 reaction BooleanTypeCreated {
@@ -420,7 +395,20 @@ routine createBaseTypeForUnsignedDiscrete(asem_p::UnsignedDiscreteType udType) {
     }
     update {
         btd.name = udType.name
-        size.value = 32bi
+        // Genuinely ambiguous (8/16/32 are all real, different types) — ask rather than
+        // guess. Boolean (fixed at 1 bit by Rule 7's own OCL constraint) is NOT asked about,
+        // since there's no actual decision to make there.
+        val String userMsg = "An UnsignedDiscreteType '" + udType.name + "' was created in ASEM. " +
+            "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
+        val String[] selections = #["8", "16", "32"]
+        val selected = userInteractor.singleSelectionDialogBuilder.message(userMsg).choices(selections).windowModality(
+            tools.vitruv.change.interaction.UserInteractionOptions.WindowModality.MODAL).startInteraction()
+        switch (selected) {
+            case 0: size.value = 8bi
+            case 1: size.value = 16bi
+            case 2: size.value = 32bi
+            default: size.value = 32bi
+        }
         size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
         btd.size = size
         // "u" prefix keeps this consistent with the forward direction's own
@@ -449,7 +437,19 @@ routine createBaseTypeForSignedDiscrete(asem_p::SignedDiscreteType sdType) {
     }
     update {
         btd.name = sdType.name
-        size.value = 32bi
+        // Same reasoning as UnsignedDiscreteType above — 8/16/32 are all real, different
+        // types, genuinely ambiguous, so ask rather than guess.
+        val String userMsg = "A SignedDiscreteType '" + sdType.name + "' was created in ASEM. " +
+            "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
+        val String[] selections = #["8", "16", "32"]
+        val selected = userInteractor.singleSelectionDialogBuilder.message(userMsg).choices(selections).windowModality(
+            tools.vitruv.change.interaction.UserInteractionOptions.WindowModality.MODAL).startInteraction()
+        switch (selected) {
+            case 0: size.value = 8bi
+            case 1: size.value = 16bi
+            case 2: size.value = 32bi
+            default: size.value = 32bi
+        }
         size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
         btd.size = size
         alias.target = "asem"
@@ -477,7 +477,18 @@ routine createBaseTypeForContinuous(asem_p::ContinuousType contType) {
     }
     update {
         btd.name = contType.name
-        size.value = 64bi
+        // 32-bit (float) vs 64-bit (double) are genuinely different types with different
+        // precision, not one type with cosmetic variation — ask rather than guess.
+        val String userMsg = "A ContinuousType '" + contType.name + "' was created in ASEM. " +
+            "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
+        val String[] selections = #["32", "64"]
+        val selected = userInteractor.singleSelectionDialogBuilder.message(userMsg).choices(selections).windowModality(
+            tools.vitruv.change.interaction.UserInteractionOptions.WindowModality.MODAL).startInteraction()
+        switch (selected) {
+            case 0: size.value = 32bi
+            case 1: size.value = 64bi
+            default: size.value = 64bi
+        }
         size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
         btd.size = size
         // "double" keeps this consistent with the forward direction's own
@@ -504,20 +515,30 @@ routine createArrayForComposedType(asem_c::ComposedType composedType) {
         val array = new am::Array
     }
     update {
-        // numberElements intentionally left at its default (0) — ComposedType has
-        // no matching size field; adding one is P12, explicitly out of scope here.
+        array.numberElements = composedType.numberElements
         persistProjectRelative(composedType, array, "amalthea/array_" + composedType.name + ".amxmi")
         addCorrespondenceBetween(composedType, array)
     }
 }
 
+// P12 — ComposedType.numberElements changed → keep the corresponding Array in sync
+reaction ComposedTypeNumberElementsChanged {
+    after attribute replaced at asem_c::ComposedType[numberElements]
+    call syncComposedTypeNumberElementsToArray(affectedEObject)
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
+routine syncComposedTypeNumberElementsToArray(asem_c::ComposedType composedType) {
+    match {
+        val array = retrieve am::Array corresponding to composedType
+    }
+    update {
+        array.numberElements = composedType.numberElements
+    }
+}
+
+
 // SECTION 5 — Task/InterruptTask ↔ Task/ISR   (Rules 2 & 3, reverse direction)
-//
-// correspondences are NOT created here, only looked up,
-// same convention as the rest of this file.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // ASEM Task created → create an AMALTHEA Task
 reaction AsemTaskCreated {
@@ -618,5 +639,138 @@ routine syncInterruptTaskNameToISR(asem_c::InterruptTask interruptTask) {
     }
     update {
         isr.name = interruptTask.name
+    }
+}
+
+// InitTask/SoftwareTask/PeriodicTask/TimeTableTask created directly on the ASEM side →
+// create a plain AMALTHEA Task (AMALTHEA has no subtype distinction).
+
+reaction AsemInitTaskCreated {
+    after element asem_c::InitTask created
+    call createTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemSoftwareTaskCreated {
+    after element asem_c::SoftwareTask created
+    call createTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemPeriodicTaskCreated {
+    after element asem_c::PeriodicTask created
+    call createTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemTimeTableTaskCreated {
+    after element asem_c::TimeTableTask created
+    call createTaskForAsemTaskSubtype(affectedEObject)
+}
+
+routine createTaskForAsemTaskSubtype(asem_c::Task asemTask) {
+    match {
+        require absence of am::Task corresponding to asemTask
+    }
+    create {
+        val task = new am::Task
+    }
+    update {
+        task.name = asemTask.name
+        persistProjectRelative(asemTask, task, "amalthea/task_" + asemTask.name + ".amxmi")
+        addCorrespondenceBetween(asemTask, task)
+    }
+}
+
+reaction AsemInitTaskDeleted {
+    after element asem_c::InitTask deleted
+    call deleteTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemSoftwareTaskDeleted {
+    after element asem_c::SoftwareTask deleted
+    call deleteTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemPeriodicTaskDeleted {
+    after element asem_c::PeriodicTask deleted
+    call deleteTaskForAsemTaskSubtype(affectedEObject)
+}
+
+reaction AsemTimeTableTaskDeleted {
+    after element asem_c::TimeTableTask deleted
+    call deleteTaskForAsemTaskSubtype(affectedEObject)
+}
+
+routine deleteTaskForAsemTaskSubtype(asem_c::Task asemTask) {
+    match {
+        val task = retrieve am::Task corresponding to asemTask
+    }
+    update {
+        removeObject(task)
+        removeCorrespondenceBetween(asemTask, task)
+    }
+}
+
+reaction AsemInitTaskRenamed {
+    after attribute replaced at asem_c::InitTask[name]
+    call syncAsemTaskSubtypeNameToTask(affectedEObject)
+}
+
+reaction AsemSoftwareTaskRenamed {
+    after attribute replaced at asem_c::SoftwareTask[name]
+    call syncAsemTaskSubtypeNameToTask(affectedEObject)
+}
+
+reaction AsemPeriodicTaskRenamed {
+    after attribute replaced at asem_c::PeriodicTask[name]
+    call syncAsemTaskSubtypeNameToTask(affectedEObject)
+}
+
+reaction AsemTimeTableTaskRenamed {
+    after attribute replaced at asem_c::TimeTableTask[name]
+    call syncAsemTaskSubtypeNameToTask(affectedEObject)
+}
+
+routine syncAsemTaskSubtypeNameToTask(asem_c::Task asemTask) {
+    match {
+        val task = retrieve am::Task corresponding to asemTask
+    }
+    update {
+        task.name = asemTask.name
+    }
+}
+
+// PeriodicTask.period/delay -> PeriodicStimulus.recurrence/offset 
+reaction PeriodicTaskPeriodChanged {
+    after attribute replaced at asem_c::PeriodicTask[period]
+    call syncPeriodToAmalthea(affectedEObject)
+}
+
+routine syncPeriodToAmalthea(asem_c::PeriodicTask periodicTask) {
+    match {
+        val task = retrieve am::Task corresponding to periodicTask
+    }
+    update {
+        val stimulus = task.stimuli.filter(typeof(org.eclipse.app4mc.amalthea.model.PeriodicStimulus)).head
+        if (stimulus !== null && stimulus.recurrence !== null) {
+            stimulus.recurrence.value = java.math.BigInteger.valueOf(periodicTask.period)
+            stimulus.recurrence.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+        }
+    }
+}
+
+reaction PeriodicTaskDelayChanged {
+    after attribute replaced at asem_c::PeriodicTask[delay]
+    call syncDelayToAmalthea(affectedEObject)
+}
+
+routine syncDelayToAmalthea(asem_c::PeriodicTask periodicTask) {
+    match {
+        val task = retrieve am::Task corresponding to periodicTask
+    }
+    update {
+        val stimulus = task.stimuli.filter(typeof(org.eclipse.app4mc.amalthea.model.PeriodicStimulus)).head
+        if (stimulus !== null && stimulus.offset !== null) {
+            stimulus.offset.value = java.math.BigInteger.valueOf(periodicTask.delay)
+            stimulus.offset.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+        }
     }
 }

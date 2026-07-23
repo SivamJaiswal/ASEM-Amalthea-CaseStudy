@@ -9,10 +9,16 @@ import org.eclipse.app4mc.amalthea.model.BaseTypeDefinition;
 import org.eclipse.app4mc.amalthea.model.Component;
 import org.eclipse.app4mc.amalthea.model.ISR;
 import org.eclipse.app4mc.amalthea.model.Label;
+import org.eclipse.app4mc.amalthea.model.PeriodicStimulus;
 import org.eclipse.app4mc.amalthea.model.Runnable;
+import org.eclipse.app4mc.amalthea.model.TimeUnit;
 
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.InitTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.SoftwareTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.PeriodicTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.TimeTableTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Task;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Constant;
@@ -33,8 +39,6 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
  * AsemToAmaltheaTest
  *
  * Tests all E and P rules where changes originate on the ASEM side.
- * Uses name-based lookups — never holds stale EMF object references
- * across view commits.
  */
 @TestMethodOrder(MethodOrderer.DisplayName.class)
 public class AsemToAmaltheaTest {
@@ -47,7 +51,7 @@ public class AsemToAmaltheaTest {
                 .put("*", new XMIResourceFactoryImpl());
     }
 
-    // ── E3 / E4 — Module ↔ Component ─────────────────────────────────────────
+    // E3 / E4 — Module ↔ Component
 
     @Test
     @DisplayName("E3 – Module created → Component with same name in AMALTHEA view")
@@ -77,7 +81,7 @@ public class AsemToAmaltheaTest {
                 "Component must be removed");
     }
 
-    // ── P2 — Module.name → Component.name ────────────────────────────────────
+    // P2 — Module.name → Component.name
 
     @Test
     @DisplayName("P2 – Module renamed → Component name updated")
@@ -92,7 +96,7 @@ public class AsemToAmaltheaTest {
         assertNotNull(util.getCorrespondingInAmalthea(vsum, "UpdatedName", Component.class));
     }
 
-    // ── E7 / E8 — Method ↔ Runnable ──────────────────────────────────────────
+    // E7 / E8 — Method ↔ Runnable
 
     @Test
     @DisplayName("E7 – Void no-param Method → Runnable in Component.runnables")
@@ -141,7 +145,7 @@ public class AsemToAmaltheaTest {
                 "Runnable must be removed");
     }
 
-    // ── P4 — Method.name → Runnable.name ─────────────────────────────────────
+    // P4 — Method.name → Runnable.name
 
     @Test
     @DisplayName("P4 – Method renamed → Runnable name updated")
@@ -157,7 +161,7 @@ public class AsemToAmaltheaTest {
         assertNotNull(util.getCorrespondingInAmalthea(vsum, "newOp", Runnable.class));
     }
 
-    // ── E12 — Message → Label (constant=false) ────────────────────────────────
+    // E12 — Message → Label (constant=false)
 
     @Test
     @DisplayName("E12 – Message created → non-constant Label in Component.labels")
@@ -178,7 +182,7 @@ public class AsemToAmaltheaTest {
                 .anyMatch(l -> label.getName().equals(l.getName())));
     }
 
-    // ── E13 — Constant → Label (constant=true) ───────────────────────────────
+    // E13 — Constant → Label (constant=true)
 
     @Test
     @DisplayName("E13 – Constant created → constant Label in Component.labels")
@@ -199,7 +203,7 @@ public class AsemToAmaltheaTest {
                 .anyMatch(l -> label.getName().equals(l.getName())));
     }
 
-    // ── P6 / P7 — name propagation ────────────────────────────────────────────
+    // P6 / P7 — name propagation
 
     @Test
     @DisplayName("P6 – Message renamed → Label name updated")
@@ -229,7 +233,7 @@ public class AsemToAmaltheaTest {
         assertNotNull(util.getCorrespondingInAmalthea(vsum, "NEW_PARAM", Label.class));
     }
 
-    // ── Bidirectional round-trip ──────────────────────────────────────────────
+    // Bidirectional round-trip
 
     @Test
     @DisplayName("Bidirectional – Component/Module names stay in sync after alternating renames")
@@ -268,7 +272,7 @@ public class AsemToAmaltheaTest {
         assertNotNull(util.getCorrespondingInAmalthea(vsum, "fromAsem", Runnable.class));
     }
 
-    // ── R2 / R3 (reverse) — ASEM Task/InterruptTask → AMALTHEA Task/ISR ─────
+    // R2 / R3 (reverse) — ASEM Task/InterruptTask → AMALTHEA Task/ISR
 
     @Test
     @DisplayName("R2 (reverse) – ASEM Task created → AMALTHEA Task exists")
@@ -297,7 +301,107 @@ public class AsemToAmaltheaTest {
         assertEquals("reverseISR", isr.getName());
     }
 
-    // ── R5 / R6 (reverse) — Input/Output/SystemConstant → Label ──────────────
+    @Test
+    @DisplayName("R2 (reverse) – ASEM InitTask created → AMALTHEA Task exists")
+    void r2_asemInitTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemInitTask(vsum, tempDir, "reverseInitTask");
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reverseInitTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task, "AMALTHEA Task must be created for the ASEM InitTask");
+        assertEquals("reverseInitTask", task.getName());
+    }
+
+    @Test
+    @DisplayName("R2 (reverse) – ASEM SoftwareTask created → AMALTHEA Task exists")
+    void r2_asemSoftwareTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemSoftwareTask(vsum, tempDir, "reverseSoftwareTask");
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reverseSoftwareTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task, "AMALTHEA Task must be created for the ASEM SoftwareTask");
+        assertEquals("reverseSoftwareTask", task.getName());
+    }
+
+    @Test
+    @DisplayName("R2 (reverse) – ASEM PeriodicTask created → AMALTHEA Task exists")
+    void r2_asemPeriodicTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemPeriodicTask(vsum, tempDir, "reversePeriodicTask");
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reversePeriodicTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task, "AMALTHEA Task must be created for the ASEM PeriodicTask");
+        assertEquals("reversePeriodicTask", task.getName());
+    }
+
+    @Test
+    @DisplayName("PeriodicTask fields (reverse) – period/delay changed in ASEM → PeriodicStimulus updated in AMALTHEA")
+    void periodicTaskFields_periodDelayChanged_stimulusUpdated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemPeriodicTask(vsum, tempDir, "reversePeriodicTask");
+        util.addPeriodicStimulus(vsum, "reversePeriodicTask", 10, 5);
+
+        util.setPeriodicTaskPeriod(vsum, "reversePeriodicTask", 250);
+        util.setPeriodicTaskDelay(vsum, "reversePeriodicTask", 100);
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reversePeriodicTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task);
+        PeriodicStimulus stimulus = (PeriodicStimulus) task.getStimuli().stream()
+                .filter(s -> s instanceof PeriodicStimulus).findFirst().orElse(null);
+        assertNotNull(stimulus, "PeriodicStimulus must still be attached");
+        assertEquals(250, stimulus.getRecurrence().getValue().intValue());
+        assertEquals(TimeUnit.MS, stimulus.getRecurrence().getUnit());
+        assertEquals(100, stimulus.getOffset().getValue().intValue());
+        assertEquals(TimeUnit.MS, stimulus.getOffset().getUnit());
+    }
+
+    @Test
+    @DisplayName("PeriodicTask fields (reverse) – period/delay set before any AMALTHEA stimulus exists → no stimulus auto-created")
+    void periodicTaskFields_periodSetBeforeStimulusExists_noAutoCreate(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemPeriodicTask(vsum, tempDir, "earlyPeriodicTask");
+
+        assertDoesNotThrow(() -> {
+            util.setPeriodicTaskPeriod(vsum, "earlyPeriodicTask", 250);
+            util.setPeriodicTaskDelay(vsum, "earlyPeriodicTask", 100);
+        });
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "earlyPeriodicTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task);
+        boolean hasStimulus = task.getStimuli().stream().anyMatch(s -> s instanceof PeriodicStimulus);
+        assertFalse(hasStimulus, "no PeriodicStimulus should have been auto-created");
+    }
+
+    @Test
+    @DisplayName("R2 (reverse) – ASEM TimeTableTask created → AMALTHEA Task exists")
+    void r2_asemTimeTableTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemTimeTableTask(vsum, tempDir, "reverseTimeTableTask");
+
+        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
+                vsum, "reverseTimeTableTask", org.eclipse.app4mc.amalthea.model.Task.class);
+        assertNotNull(task, "AMALTHEA Task must be created for the ASEM TimeTableTask");
+        assertEquals("reverseTimeTableTask", task.getName());
+    }
+
+    // R5 / R6 (reverse) — Input/Output/SystemConstant → Label
 
     @Test
     @DisplayName("R6 (reverse) – Input created → non-constant Label")
@@ -341,7 +445,7 @@ public class AsemToAmaltheaTest {
         assertTrue(label.isConstant(), "Label.constant must be true");
     }
 
-    // ── R7-R10 (reverse) — PrimitiveType/ComposedType → BaseTypeDefinition/Array ─
+    // R7-R10 (reverse) — PrimitiveType/ComposedType → BaseTypeDefinition/Array
 
     @Test
     @DisplayName("R7 (reverse) – ASEM BooleanType created → BaseTypeDefinition size=1 bit")
@@ -370,6 +474,20 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
+    @DisplayName("R8 (reverse, interactive) – user picks 8 → BaseTypeDefinition size=8 bit")
+    void r8_asemUnsignedDiscreteTypeCreated_userPicks8_size8(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemUnsignedDiscreteType(vsum, tempDir, "reverseUint8", "8");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseUint8", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM UnsignedDiscreteType");
+        assertEquals(8, btd.getSize().getValue().intValue(),
+                "size must reflect the user's dialog answer, not the old hardcoded 32");
+    }
+
+    @Test
     @DisplayName("R8 (reverse) – ASEM SignedDiscreteType created → BaseTypeDefinition size=32 bit")
     void r8_asemSignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
@@ -380,6 +498,20 @@ public class AsemToAmaltheaTest {
         BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseSint", BaseTypeDefinition.class);
         assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM SignedDiscreteType");
         assertEquals(32, btd.getSize().getValue().intValue());
+    }
+
+    @Test
+    @DisplayName("R8 (reverse, interactive) – user picks 16 → BaseTypeDefinition size=16 bit")
+    void r8_asemSignedDiscreteTypeCreated_userPicks16_size16(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemSignedDiscreteType(vsum, tempDir, "reverseSint16", "16");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseSint16", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM SignedDiscreteType");
+        assertEquals(16, btd.getSize().getValue().intValue(),
+                "size must reflect the user's dialog answer, not the old hardcoded 32");
     }
 
     @Test
@@ -396,6 +528,20 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
+    @DisplayName("R9 (reverse, interactive) – user picks 32 → BaseTypeDefinition size=32 bit")
+    void r9_asemContinuousTypeCreated_userPicks32_size32(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemContinuousType(vsum, tempDir, "reverseFloat32", "32");
+
+        BaseTypeDefinition btd = util.getCorrespondingInAmalthea(vsum, "reverseFloat32", BaseTypeDefinition.class);
+        assertNotNull(btd, "BaseTypeDefinition must be created for the ASEM ContinuousType");
+        assertEquals(32, btd.getSize().getValue().intValue(),
+                "size must reflect the user's dialog answer, not the old hardcoded 64");
+    }
+
+    @Test
     @DisplayName("R10 (reverse) – ASEM ComposedType created → Array exists")
     void r10_asemComposedTypeCreated_arrayCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
@@ -405,5 +551,32 @@ public class AsemToAmaltheaTest {
 
         Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
         assertNotNull(array, "Array must be created for the ASEM ComposedType");
+    }
+
+    @Test
+    @DisplayName("P12 (reverse) – ComposedType.numberElements copied to Array at creation")
+    void p12_asemComposedTypeCreated_numberElementsCopied(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemComposedType(vsum, tempDir, "reverseComposed", 15);
+
+        Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
+        assertNotNull(array, "Array must be created for the ASEM ComposedType");
+        assertEquals(15, array.getNumberElements());
+    }
+
+    @Test
+    @DisplayName("P12 (reverse) – ComposedType.numberElements changed → Array.numberElements updated")
+    void p12_asemComposedTypeNumberElementsChanged_arrayUpdated(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemComposedType(vsum, tempDir, "reverseComposed", 15);
+        util.setComposedTypeNumberElements(vsum, "reverseComposed", 40);
+
+        Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
+        assertNotNull(array);
+        assertEquals(40, array.getNumberElements());
     }
 }

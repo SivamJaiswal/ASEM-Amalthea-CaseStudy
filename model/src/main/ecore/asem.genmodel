@@ -26,6 +26,7 @@
       <genClasses ecoreClass="asem.ecore#//classifiers/ComposedType">
         <genFeatures notify="false" createChild="false" propertySortChoices="true"
             ecoreFeature="ecore:EReference asem.ecore#//classifiers/ComposedType/primitiveType"/>
+        <genFeatures createChild="false" ecoreFeature="ecore:EAttribute asem.ecore#//classifiers/ComposedType/numberElements"/>
       </genClasses>
       <genClasses image="false" ecoreClass="asem.ecore#//classifiers/Component">
         <genFeatures property="None" children="true" createChild="true" ecoreFeature="ecore:EReference asem.ecore#//classifiers/Component/typedElements"/>
@@ -39,6 +40,17 @@
       </genClasses>
       <!-- changes made by uskui -->
       <genClasses ecoreClass="asem.ecore#//classifiers/InterruptTask"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/InitTask"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/SoftwareTask"/>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/PeriodicTask">
+        <genFeatures createChild="false" ecoreFeature="ecore:EAttribute asem.ecore#//classifiers/PeriodicTask/period"/>
+        <genFeatures createChild="false" ecoreFeature="ecore:EAttribute asem.ecore#//classifiers/PeriodicTask/delay"/>
+      </genClasses>
+      <!-- changes made by uskui -->
+      <genClasses ecoreClass="asem.ecore#//classifiers/TimeTableTask"/>
     </nestedGenPackages>
     <nestedGenPackages prefix="Dataexchange" disposableProviderFactory="true" ecorePackage="asem.ecore#//dataexchange">
       <genClasses ecoreClass="asem.ecore#//dataexchange/Variable">

@@ -26,15 +26,24 @@ import org.eclipse.app4mc.amalthea.model.IExecutable;
 import org.eclipse.app4mc.amalthea.model.Label;
 import org.eclipse.app4mc.amalthea.model.LabelAccess;
 import org.eclipse.app4mc.amalthea.model.LabelAccessEnum;
+import org.eclipse.app4mc.amalthea.model.PeriodicStimulus;
+import org.eclipse.app4mc.amalthea.model.ProbabilitySwitch;
+import org.eclipse.app4mc.amalthea.model.ProbabilitySwitchEntry;
 import org.eclipse.app4mc.amalthea.model.Runnable;
 import org.eclipse.app4mc.amalthea.model.RunnableCall;
 import org.eclipse.app4mc.amalthea.model.SWModel;
 import org.eclipse.app4mc.amalthea.model.Tag;
+import org.eclipse.app4mc.amalthea.model.Time;
+import org.eclipse.app4mc.amalthea.model.TimeUnit;
 
 import edu.kit.ipd.sdq.metamodels.asem.AsemFactory;
 import edu.kit.ipd.sdq.metamodels.asem.Dummy;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Classifier;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.InitTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.SoftwareTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.PeriodicTask;
+import edu.kit.ipd.sdq.metamodels.asem.classifiers.TimeTableTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Task;
@@ -49,6 +58,7 @@ import edu.kit.ipd.sdq.metamodels.asem.dataexchange.SystemConstant;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.impl.DataexchangeFactoryImpl;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.BooleanType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.ContinuousType;
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.PrimitiveTypeRepository;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.SignedDiscreteType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.UnsignedDiscreteType;
 import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.impl.PrimitivetypesFactoryImpl;
@@ -66,14 +76,8 @@ import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 import mir.reactions.amaltheaToAsem.AmaltheaToAsemChangePropagationSpecification;
 import mir.reactions.asemToAmalthea.AsemToAmaltheaChangePropagationSpecification;
 
-/**
- * VSUMRunner — mirrors BrakeCaseStudy TestUtil.
- *
- * ASEM root structure:
- *   Dummy (root, registered at asem.asem) contains Module objects.
- *   All ASEM modifications open a view selecting Dummy.class,
- *   navigate to Dummy, then modify its contained Modules.
- *   This keeps all changes in the same tracked resource.
+/*
+ * ASEM root structure: Dummy (root, registered at asem.asem) contains Module objects.
  */
 public class VSUMRunner {
 
@@ -83,7 +87,7 @@ public class VSUMRunner {
     private static final String AMALTHEA_FILE = "/amalthea.amxmi";
     private static final String ASEM_FILE      = "/asem.asem";
 
-    // ── VSUM setup ────────────────────────────────────────────────────────────
+    //VSUM setup
 
     public InternalVirtualModel createDefaultVirtualModel(Path projectPath)
             throws IOException {
@@ -126,7 +130,7 @@ public class VSUMRunner {
         });
     }
 
-    // ── View helpers ──────────────────────────────────────────────────────────
+    //View helpers 
 
     public void modifyView(CommittableView view, Consumer<CommittableView> fn) {
         fn.accept(view);
@@ -165,8 +169,18 @@ public class VSUMRunner {
         return null;
     }
 
-    // ── Correspondence lookup ─────────────────────────────────────────────────
+    /**
+     * PrimitiveTypeRepository extends Named, not Classifier, so it doesn't show up in
+     * getAsemView's selectable set — needs its own view, same reason getCorrespondingInAmalthea
+     * has a fallback search for other independently-persisted roots.
+     */
+    public PrimitiveTypeRepository getPrimitiveTypeRepository(VirtualModel vsum) {
+        var repos = getDefaultView(vsum, List.of(PrimitiveTypeRepository.class))
+                .getRootObjects(PrimitiveTypeRepository.class);
+        return repos.isEmpty() ? null : repos.iterator().next();
+    }
 
+    //Correspondence lookup
     public <T extends EObject> T getCorrespondingInAsem(VirtualModel vsum,
                                                          String sourceName,
                                                          Class<T> targetType) {
@@ -184,10 +198,7 @@ public class VSUMRunner {
             T found = findByNameAndType(root, targetType, sourceName);
             if (found != null) return found;
         }
-        // also check standalone Component/Runnable/Label/Task/ISR/BaseTypeDefinition/Array
-        // roots directly (auto-created by AsemToAmalthea.reactions via persistProjectRelative,
-        // since none of them have a correspondence/containment path back to the Amalthea
-        // root's SWModel/ComponentsModel)
+        // also check standalone Component/Runnable/Label/Task/ISR/BaseTypeDefinition/Array roots
         for (EObject root : getDefaultView(vsum,
                 List.of(Component.class, Runnable.class, Label.class,
                         org.eclipse.app4mc.amalthea.model.Task.class,
@@ -221,7 +232,7 @@ public class VSUMRunner {
         }
     }
 
-    // ── AMALTHEA helpers ──────────────────────────────────────────────────────
+    //AMALTHEA helpers
 
     public String addComponent(VirtualModel vsum, String name) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -284,6 +295,16 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Changes an existing BaseTypeDefinition's size in bits (P11 propagation test). */
+    public void changeBaseTypeDefinitionSize(VirtualModel vsum, String name, int newSizeBits) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            BaseTypeDefinition btd = findByNameAndType(
+                    getAmaltheaRoot(v), BaseTypeDefinition.class, name);
+            if (btd != null) btd.getSize().setValue(BigInteger.valueOf(newSizeBits));
+        });
+    }
+
     public String addArrayTypeDefinition(VirtualModel vsum, String name,
                                           int elements) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -299,7 +320,32 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Changes an existing Array's numberElements (P12 propagation test). */
+    public void setArrayNumberElements(VirtualModel vsum, int newElements) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Array array = findByNameAndType(getAmaltheaRoot(v), Array.class, null);
+            if (array != null) array.setNumberElements(newElements);
+        });
+    }
+
+    /**
+     * Creates a Task. Task creation asks (via userInteraction) which ASEM Task
+     * subtype to use — defaults to "SoftwareTask" so existing callers don't need
+     * to script a response themselves.
+     */
     public String addTask(VirtualModel vsum, String componentName, String taskName) {
+        return addTask(vsum, componentName, taskName, "SoftwareTask");
+    }
+
+    /**
+     * Creates a Task, scripting {@code subtypeChoice} ("InitTask" / "SoftwareTask" /
+     * "PeriodicTask" / "TimeTableTask") as the answer to the resulting Task-subtype
+     * selection dialog.
+     */
+    public String addTask(VirtualModel vsum, String componentName, String taskName,
+                           String subtypeChoice) {
+        userInteraction.onNextMultipleChoiceSingleSelection().respondWith(subtypeChoice);
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             Component comp = findByNameAndType(
@@ -311,6 +357,71 @@ public class VSUMRunner {
             comp.getProcesses().add(task);
         });
         return taskName;
+    }
+
+    /** Attaches a PeriodicStimulus (recurrence/offset in milliseconds) to an existing Task. */
+    public void addPeriodicStimulus(VirtualModel vsum, String taskName,
+                                     int recurrenceMs, int offsetMs) {
+        addPeriodicStimulus(vsum, taskName, recurrenceMs, TimeUnit.MS, offsetMs, TimeUnit.MS);
+    }
+
+    /** Attaches a PeriodicStimulus with an explicit unit for recurrence and offset. */
+    public void addPeriodicStimulus(VirtualModel vsum, String taskName,
+                                     int recurrenceValue, TimeUnit recurrenceUnit,
+                                     int offsetValue, TimeUnit offsetUnit) {
+        CommittableView view = getDefaultView(vsum,
+                List.of(Amalthea.class, org.eclipse.app4mc.amalthea.model.Task.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            Amalthea root = getAmaltheaRoot(v);
+            if (root.getStimuliModel() == null) {
+                root.setStimuliModel(AmaltheaFactory.eINSTANCE.createStimuliModel());
+            }
+            org.eclipse.app4mc.amalthea.model.Task task = null;
+            for (EObject r : v.getRootObjects()) {
+                task = findByNameAndType(r, org.eclipse.app4mc.amalthea.model.Task.class, taskName);
+                if (task != null) break;
+            }
+            PeriodicStimulus stimulus = AmaltheaFactory.eINSTANCE.createPeriodicStimulus();
+            Time recurrence = AmaltheaFactory.eINSTANCE.createTime();
+            recurrence.setValue(BigInteger.valueOf(recurrenceValue));
+            recurrence.setUnit(recurrenceUnit);
+            stimulus.setRecurrence(recurrence);
+            Time offset = AmaltheaFactory.eINSTANCE.createTime();
+            offset.setValue(BigInteger.valueOf(offsetValue));
+            offset.setUnit(offsetUnit);
+            stimulus.setOffset(offset);
+            root.getStimuliModel().getStimuli().add(stimulus);
+            task.getStimuli().add(stimulus);
+        });
+    }
+
+    /** Changes an existing PeriodicTask's period (ms) in ASEM (P-rule reverse-sync test). */
+    public void setPeriodicTaskPeriod(VirtualModel vsum, String taskName, int periodMs) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            for (EObject root : v.getRootObjects()) {
+                PeriodicTask task = findByNameAndType(root, PeriodicTask.class, taskName);
+                if (task != null) {
+                    task.setPeriod(periodMs);
+                    return;
+                }
+            }
+        });
+    }
+
+    /** Changes an existing PeriodicTask's delay (ms) in ASEM (P-rule reverse-sync test). */
+    public void setPeriodicTaskDelay(VirtualModel vsum, String taskName, int delayMs) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            for (EObject root : v.getRootObjects()) {
+                PeriodicTask task = findByNameAndType(root, PeriodicTask.class, taskName);
+                if (task != null) {
+                    task.setDelay(delayMs);
+                    return;
+                }
+            }
+        });
     }
 
     public String addISR(VirtualModel vsum, String componentName, String isrName) {
@@ -345,6 +456,39 @@ public class VSUMRunner {
             RunnableCall call = AmaltheaFactory.eINSTANCE.createRunnableCall();
             call.setRunnable(callee);
             caller.getActivityGraph().getItems().add(call);
+        });
+    }
+
+    /**
+     * Adds a RunnableCall buried two levels deep inside a ProbabilitySwitch
+     * (Task/ISR.activityGraph -> ProbabilitySwitch -> ProbabilitySwitchEntry -> RunnableCall),
+     * instead of directly on the Task/ISR's activityGraph. Used to verify whether
+     * AMALTHEA's derived ActivityGraphItem.containingExecutable resolves correctly
+     * through nested call structures, not just flat ones.
+     */
+    public void addNestedRunnableCall(VirtualModel vsum, String callerName, String calleeRunnableName) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            IExecutable caller = findByNameAndType(
+                    getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.Task.class, callerName);
+            if (caller == null) {
+                caller = findByNameAndType(
+                        getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.ISR.class, callerName);
+            }
+            Runnable callee = findByNameAndType(
+                    getAmaltheaRoot(v), Runnable.class, calleeRunnableName);
+            if (caller.getActivityGraph() == null) {
+                caller.setActivityGraph(AmaltheaFactory.eINSTANCE.createActivityGraph());
+            }
+            ProbabilitySwitch probSwitch = AmaltheaFactory.eINSTANCE.createProbabilitySwitch();
+            ProbabilitySwitchEntry entry = AmaltheaFactory.eINSTANCE.createProbabilitySwitchEntry();
+            entry.setProbability(1.0);
+            RunnableCall call = AmaltheaFactory.eINSTANCE.createRunnableCall();
+            call.setRunnable(callee);
+
+            entry.getItems().add(call);
+            probSwitch.getEntries().add(entry);
+            caller.getActivityGraph().getItems().add(probSwitch);
         });
     }
 
@@ -421,7 +565,7 @@ public class VSUMRunner {
         });
     }
 
-    // ── ASEM helpers — all navigate through Dummy root ────────────────────────
+    //ASEM helpers — all navigate through Dummy root
 
     /**
      * Adds a Module as a child of the Dummy root.
@@ -525,6 +669,54 @@ public class VSUMRunner {
         return name;
     }
 
+    public String addAsemInitTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            InitTask initTask = ClassifiersFactoryImpl.eINSTANCE.createInitTask();
+            initTask.setName(name);
+            v.registerRoot(initTask,
+                    URI.createFileURI(filePath.toString() + "/asem_inittask_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemSoftwareTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            SoftwareTask softwareTask = ClassifiersFactoryImpl.eINSTANCE.createSoftwareTask();
+            softwareTask.setName(name);
+            v.registerRoot(softwareTask,
+                    URI.createFileURI(filePath.toString() + "/asem_softwaretask_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemPeriodicTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            PeriodicTask periodicTask = ClassifiersFactoryImpl.eINSTANCE.createPeriodicTask();
+            periodicTask.setName(name);
+            v.registerRoot(periodicTask,
+                    URI.createFileURI(filePath.toString() + "/asem_periodictask_" + name + ".asem"));
+        });
+        return name;
+    }
+
+    public String addAsemTimeTableTask(VirtualModel vsum, Path filePath, String name) {
+        CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
+                .withChangeRecordingTrait();
+        modifyView(view, v -> {
+            TimeTableTask timeTableTask = ClassifiersFactoryImpl.eINSTANCE.createTimeTableTask();
+            timeTableTask.setName(name);
+            v.registerRoot(timeTableTask,
+                    URI.createFileURI(filePath.toString() + "/asem_timetabletask_" + name + ".asem"));
+        });
+        return name;
+    }
+
     public String addAsemBooleanType(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -537,7 +729,14 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Creates an UnsignedDiscreteType. Answers the resulting size dialog with "32" (current default). */
     public String addAsemUnsignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
+        return addAsemUnsignedDiscreteType(vsum, filePath, name, "32");
+    }
+
+    /** Creates an UnsignedDiscreteType, scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
+    public String addAsemUnsignedDiscreteType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
+        userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -549,7 +748,14 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Creates a SignedDiscreteType. Answers the resulting size dialog with "32" (current default). */
     public String addAsemSignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
+        return addAsemSignedDiscreteType(vsum, filePath, name, "32");
+    }
+
+    /** Creates a SignedDiscreteType, scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
+    public String addAsemSignedDiscreteType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
+        userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -561,7 +767,14 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Creates a ContinuousType. Answers the resulting size dialog with "64" (current default). */
     public String addAsemContinuousType(VirtualModel vsum, Path filePath, String name) {
+        return addAsemContinuousType(vsum, filePath, name, "64");
+    }
+
+    /** Creates a ContinuousType, scripting {@code sizeChoice} ("32"/"64") as the dialog answer. */
+    public String addAsemContinuousType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
+        userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -574,15 +787,37 @@ public class VSUMRunner {
     }
 
     public String addAsemComposedType(VirtualModel vsum, Path filePath, String name) {
+        return addAsemComposedType(vsum, filePath, name, 0);
+    }
+
+    public String addAsemComposedType(VirtualModel vsum, Path filePath, String name,
+                                       int numberElements) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
         modifyView(view, v -> {
             ComposedType composedType = ClassifiersFactoryImpl.eINSTANCE.createComposedType();
             composedType.setName(name);
+            composedType.setNumberElements(numberElements);
             v.registerRoot(composedType,
                     URI.createFileURI(filePath.toString() + "/asem_composedtype_" + name + ".asem"));
         });
         return name;
+    }
+
+    /** Changes an existing ComposedType's numberElements (P12 propagation test). */
+    public void setComposedTypeNumberElements(VirtualModel vsum, String composedTypeName,
+                                               int newElements) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            for (EObject root : v.getRootObjects()) {
+                ComposedType composedType = findByNameAndType(
+                        root, ComposedType.class, composedTypeName);
+                if (composedType != null) {
+                    composedType.setNumberElements(newElements);
+                    return;
+                }
+            }
+        });
     }
 
     public String addMessage(VirtualModel vsum, String moduleName,
@@ -628,7 +863,7 @@ public class VSUMRunner {
         });
     }
 
-    // ── Private utilities ─────────────────────────────────────────────────────
+    //Private utilities
 
     /** Scans all roots in the ASEM view for a Module with the given name. */
     private Module findModuleInView(CommittableView v, String name) {

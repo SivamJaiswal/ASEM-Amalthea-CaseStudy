@@ -27,7 +27,7 @@ For the purpose of the AMALTHEA ↔ ASEM consistency case study, the relevant su
 
 ### 1.2 Scope: Classes Relevant to ASEM Mapping
 
-The full AMALTHEA metamodel is very large. This document focuses on the classes that participate in the semantic overlap with ASEM, as defined by the consistency rules derived from Mazkatli et al. (2016), Table 5.1.
+The full AMALTHEA metamodel is very large. This document focuses on the classes that participate in the semantic overlap with ASEM.
 
 | AMALTHEA Class | Location in Model | Role in Mapping |
 |---|---|---|
@@ -193,8 +193,8 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | Sub-package | URI / nsPrefix | Purpose |
 |---|---|---|
 | **base** | `edu.kit.ipd.sdq.metamodels.asem.base` | Abstract base concepts: naming, identity, typed elements |
-| **classifiers** | `edu.kit.ipd.sdq.metamodels.asem.classifiers` | Classifier hierarchy: `Classifier`, `ComposedType`, `Component`, `Class`, `Module` |
-| **dataexchange** | `edu.kit.ipd.sdq.metamodels.asem.dataexchange` | Data exchange elements: `Variable`, `Message`, `Method`, `Parameter`, `ReturnType`, `Constant` |
+| **classifiers** | `edu.kit.ipd.sdq.metamodels.asem.classifiers` | Classifier hierarchy: `Classifier`, `ComposedType`, `Component`, `Class`, `Module`, `Task`, `InterruptTask`, `InitTask`, `SoftwareTask`, `PeriodicTask`, `TimeTableTask` |
+| **dataexchange** | `edu.kit.ipd.sdq.metamodels.asem.dataexchange` | Data exchange elements: `Variable`, `Message`, `Method`, `Parameter`, `ReturnType`, `Constant`, `SystemConstant`, `Argument`, `Input`, `Output` |
 | **primitivetypes** | `edu.kit.ipd.sdq.metamodels.asem.primitivetypes` | Primitive type hierarchy: `PrimitiveType`, `ContinuousType`, `UnsignedDiscreteType`, `SignedDiscreteType`, `BooleanType`, `PrimitiveTypeRepository` |
 
 ### 2.3 Package: base
@@ -233,6 +233,7 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | Attribute / Reference | Type | Multiplicity | Description |
 |---|---|---|---|
 | `primitiveType` | `primitivetypes::PrimitiveType` | 0..1 | The primitive type that this composed type is based on. |
+| `numberElements` | `EInt` | 0..1 | Element count, mirroring AMALTHEA `Array.numberElements` (Rule 10 / P12). Default `0`. |
 
 **Component** (abstract) — Abstract base for software components. Supertypes: `Identifiable`, `Classifier`, `Named`.
 
@@ -246,6 +247,28 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 **Class** — A concrete component modelling an object-oriented class. Supertype: `Component`. Inherits all attributes and references from `Component`. No additional features.
 
 **Module** — A concrete component modelling a software module (e.g. an AUTOSAR software component). Supertype: `Component`. Inherits all attributes and references from `Component`. No additional features. This is the primary mapping target for AMALTHEA `Component`.
+
+**Task** — A schedulable unit of execution, modelling AMALTHEA's `Task`. Supertype: `Classifier`.
+
+| Attribute / Reference | Type | Multiplicity | Description |
+|---|---|---|---|
+| `name` | `EString` (inherited) | 0..1 | Task name. |
+| `processes` | `dataexchange::Method` | 0..* | Methods called by this Task, populated from AMALTHEA's `Task.activityGraph` → `RunnableCall`s (see Rule 2). |
+
+`Task` is concrete (instantiable directly) but in practice every AMALTHEA `Task` is mapped onto one of its four concrete subtypes below, chosen interactively (see Rule 2 for the mechanism — AMALTHEA has no field that signals which subtype applies, so the choice is asked for at Task-creation time rather than guessed).
+
+**InterruptTask** — The concrete Task subtype for interrupt-driven execution, modelling AMALTHEA's `ISR`. Supertype: `Task`. No additional own features. The mapping to `InterruptTask` is always unconditional (Rule 3) since AMALTHEA already separates `ISR` from `Task` as distinct classes — no selection needed.
+
+**InitTask**, **SoftwareTask**, **TimeTableTask** — three of the remaining four concrete Task subtypes , together with `InterruptTask` above and `PeriodicTask` below making all five. Supertype: `Task`. No additional own features beyond `Task` — added purely to distinguish "kind of Task" without inventing new AMALTHEA-side data.
+
+**PeriodicTask** — Supertype: `Task`. Unlike the three subtypes above, this one does carry its own data.
+
+| Attribute | Type | Multiplicity | Description |
+|---|---|---|---|
+| `period` | `EInt` | 0..1 | How often the task repeats, in milliseconds. Synced from AMALTHEA's `PeriodicStimulus.recurrence` (a unit-tagged `Time`) — see Rule 2. |
+| `delay` | `EInt` | 0..1 | Delay before the first run, in milliseconds. Synced from AMALTHEA's `PeriodicStimulus.offset`. |
+
+Both fields are always expressed in milliseconds regardless of the unit AMALTHEA's `Time` object used (seconds down to picoseconds get converted; sub-millisecond precision is truncated by integer division — acceptable for the schedules this project deals with).
 
 ### 2.5 Package: dataexchange
 
@@ -289,6 +312,20 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 |---|---|---|---|
 | `value` | `EString` | 0..1 | The literal constant value. |
 
+**SystemConstant** — A constant that specifically represents a system-level configuration value (as opposed to a plain, arbitrary constant). Supertype: `Constant`. No additional own features beyond `Constant`. Mapping target for Rule 5: a constant=true AMALTHEA `Label` carrying a `Tag` named/typed `"systemConstant"` becomes a `SystemConstant`; otherwise it stays a plain `Constant` (see Rule 5's NOTE for the full discriminator).
+
+**Argument** — A value passed at a specific method-call site. Supertype: `Variable`.
+
+| Attribute / Reference | Type | Multiplicity | Description |
+|---|---|---|---|
+| `name` | `EString` (inherited) | 0..1 | Argument name. |
+| `type` | `classifiers::Classifier` (inherited) | 0..1 | Type of the argument. |
+| `readable` / `writable` | `EBoolean` (inherited) | 0..1 | Inherited from `Variable`, not meaningfully used here. |
+
+Added to the ecore per Rule 6's target list, but **not wired to any reaction** — structurally it corresponds to AMALTHEA's `CallArgument` (`RunnableCall.arguments`, a value at one specific call site), not to `Label` (a general, reusable data element). Wiring it the same way as `Message`/`Input`/`Output` would model the wrong relationship; it needs its own rule keyed off `CallArgument` instead. See Rule 6's NOTE.
+
+**Input**, **Output** — Non-constant data elements distinguished by their access direction. Supertype: `Variable`. No additional own features beyond `Variable`. Mapping target for Rule 6: a constant=false AMALTHEA `Label` accessed only via read `LabelAccess`es becomes `Input`; accessed only via write `LabelAccess`es becomes `Output`; mixed or not-yet-known access stays `Message` (the pre-existing fallback). See Rule 6's NOTE for the retroactive-swap mechanism (a `LabelAccess` is normally added after its `Label`, so most Labels start as `Message` and get reclassified once the access pattern becomes clear).
+
 ### 2.6 Package: primitivetypes
 
 **PrimitiveType** (abstract) — Abstract base for all primitive types. Supertype: `classifiers::Classifier`. Inherits `name` and `methods` from `Classifier`.
@@ -308,6 +345,9 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | `name` | `EString` (inherited) | 0..1 | Repository name. |
 | `primitiveTypes` | `PrimitiveType` | 0..* | All primitive types in this repository. Containment. |
 
+> [!NOTE]
+> This class now corresponds to AMALTHEA's `SWModel` (specifically its `typeDefinitions` list): both are effectively a single, model-wide "library of types" container, one per model. One-directional only (AMALTHEA → ASEM) since `SWModel` is a singleton created once at VSUM setup — there's no "ASEM creates a new one" case to mirror in reverse. `SWModel` has no name of its own (`extends BaseObject`, not `Named`), so the repository's name is fixed (`"PrimitiveTypes"`) rather than copied, the same workaround already used for `ComposedType.name`. `primitiveTypes` (the containment list) is deliberately left empty — every `BooleanType`/`DiscreteType`/`ContinuousType` is already persisted as its own independent resource root, and an EObject can only have one container, so nesting them here too would silently break that existing mechanism. See `AmaltheaToAsem.reactions`, section "SWModel ↔ PrimitiveTypeRepository," for the reaction.
+
 ### 2.7 Inheritance Hierarchy Summary
 
 | Class | Direct Supertype(s) | Package |
@@ -320,12 +360,22 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | **Component** (abstract) | `Identifiable`, `Classifier`, `Named` | classifiers |
 | **Class** | `Component` | classifiers |
 | **Module** | `Component` | classifiers |
+| **Task** | `Classifier` | classifiers |
+| **InterruptTask** | `Task` | classifiers |
+| **InitTask** | `Task` | classifiers |
+| **SoftwareTask** | `Task` | classifiers |
+| **PeriodicTask** | `Task` | classifiers |
+| **TimeTableTask** | `Task` | classifiers |
 | **Variable** | `TypedElement` | dataexchange |
 | **Message** | `Variable` | dataexchange |
+| **Argument** | `Variable` | dataexchange |
+| **Input** | `Variable` | dataexchange |
+| **Output** | `Variable` | dataexchange |
 | **Parameter** | `Variable` | dataexchange |
 | **Method** | `Identifiable`, `Named` | dataexchange |
 | **ReturnType** | `TypedElement` | dataexchange |
 | **Constant** | `TypedElement` | dataexchange |
+| **SystemConstant** | `Constant` | dataexchange |
 | **PrimitiveType** (abstract) | `Classifier` | primitivetypes |
 | **ContinuousType** | `PrimitiveType` | primitivetypes |
 | **UnsignedDiscreteType** | `PrimitiveType` | primitivetypes |
@@ -346,7 +396,7 @@ The ten correspondences below cover every row in Table 5.1 of Mazkatli et al. (2
 | Rule | AMALTHEA | ASEM / Condition |
 |---|---|---|
 | **R1** | `Component` | `Module` — no OCL filter |
-| **R2** | `Task` | `Task` / `InitTask` / `SoftwareTask` / `TimeTableTask` |
+| **R2** | `Task` | `InitTask` / `SoftwareTask` / `PeriodicTask` / `TimeTableTask` — chosen interactively per Task, see §3.2 |
 | **R3** | `ISR` | `InterruptTask` — no OCL filter |
 | **R4** | `Runnable` | `Method` — `returnType=null` AND `parameters.size=0` |
 | **R5** | `Label` (constant=true) | `Parameter` / `Constant` / `Systemconstant` — `self.constant=true` |
@@ -384,7 +434,7 @@ Context asem::classifiers::Module
   Inv: self->collect(methods)->collect(arguments)->size()=0
 ```
 
-#### Rule 2 — Task ↔ Task / InitTask / SoftwareTask / TimeTableTask
+#### Rule 2 — Task ↔ InitTask / SoftwareTask / PeriodicTask / TimeTableTask
 
 | AMALTHEA | ASEM |
 |---|---|
@@ -400,12 +450,17 @@ Context Task
   Inv: self->collect(processes)->collect(arguments)->size()=0
 ```
 
-**Footnote \*\*\*\* — called runnables:** all `Runnable` instances reachable via the Task's `activityGraph.items` of type `RunnableCall`. These become entries in `Task.processes[]` (see section 4.2.3.1 of the paper).
+**Footnote \*\*\*\* — called runnables:** all `Runnable` instances reachable via the Task's `activityGraph.items` of type `RunnableCall`, including ones nested inside `Switch`/`ProbabilitySwitch` entries rather than sitting directly on the `activityGraph`. These become entries in `Task.processes[]`.
+
+> This flags this exact case as a real limitation of MIR — a `RunnableCall` reachable only through nested `CallSequence`/`LabelSwitch`/`ProbabilitySwitch` structures can't be declared in plain MIR without a custom `"..."` . The project doesn't inherit this limitation: `RunnableCallCreated` reacts to the `RunnableCall`'s type directly (not a declared traversal path), and AMALTHEA's own `ActivityGraphItem.getContainingExecutable()` is a derived reference that walks up through arbitrary nesting on its own — confirmed with a test where the call is buried inside a `ProbabilitySwitch` entry (`AmaltheaToAsemTest#r2_runnableCall_nestedInProbabilitySwitch_populatesProcesses`), passing consistently across repeated runs.
 
 > [!NOTE]
 > Priority storage in AMALTHEA 3.3 is indirect — it lives as a `SchedulingParameter` on `TaskAllocation`, not a direct attribute of `Task`. Navigation: `MappingModel → taskAllocation → schedulingParameters`. Implemented as a second, tagged Vitruv correspondence (`Task ↔ SchedulingParameter`, tag `"taskPriority"`) rather than copying the value into a new ASEM field — the value is read live from AMALTHEA via the tag when needed.
 >
-> Only a single, unified ASEM `Task` class is implemented — `InitTask`/`SoftwareTask`/`TimeTableTask` are **not** implemented as separate subclasses. Nothing on AMALTHEA's `Task` (`preemption`, `multipleTaskActivationLimit`, `stimuli`) reliably signals which of the three it should become; this is a known, documented gap rather than a guess.
+> AMALTHEA's `Task` has four possible ASEM subtypes (`InitTask`/`SoftwareTask`/`PeriodicTask`/`TimeTableTask`) and nothing on `Task` (`preemption`, `multipleTaskActivationLimit`, `stimuli`) reliably signals which one applies — this is the same "mapping one element to many elements" ambiguity . Rather than guess or default to one fixed subtype, the choice is asked for interactively: `TaskCreated`'s routine opens a single-selection dialog (via Vitruv's `UserInteractor`, the same mechanism the pcmjava case study uses for its own component-kind selection in `Java2PcmClassifier.reactions`) listing the four subtypes, and creates whichever one is chosen. In interactive use this is a real prompt to the person driving the change; in automated tests it's answered by a scripted `TestUserInteraction` response (`VSUMRunner.addTask(..., subtypeChoice)`), defaulting to `"SoftwareTask"` when a test doesn't care which subtype it gets. `InterruptTask` (Rule 3) stays unconditional — `ISR` is already a distinct AMALTHEA class, so no selection is needed there.
+
+> [!NOTE]
+> **PeriodicTask.period/delay** : synced from AMALTHEA's `PeriodicStimulus.recurrence`/`.offset` the moment a `PeriodicStimulus` is attached to a Task's `stimuli` list, via the DSL's `element X inserted in Type[feature]` trigger (`Process.stimuli` is a plain, non-containment reference — `Stimulus` objects actually live under `StimuliModel` — so this doesn't need `eContainer` navigation the way P11 would). Values are normalized to whole milliseconds regardless of which AMALTHEA `TimeUnit` was used. Reverse direction (ASEM `PeriodicTask.period`/`.delay` changed → AMALTHEA `PeriodicStimulus.recurrence`/`.offset` updated) is a plain two-attribute property sync, always writing back in milliseconds. **Scope limit:** only the moment of attaching a `PeriodicStimulus` is handled on the AMALTHEA→ASEM side — editing `recurrence.value`/`offset.value` on an *already-attached* stimulus afterward is not detected (same class of problem as P11: a nested `Time` object with no way back to its owning Task without `eContainer`). The reverse direction also doesn't auto-create a `PeriodicStimulus` if a `PeriodicTask`'s period/delay is set before any stimulus exists on the AMALTHEA side — same "no auto-create" scope choice as `Argument`.
 
 #### Rule 3 — ISR ↔ InterruptTask
 
@@ -446,7 +501,7 @@ Context amalthea::Label
 | `Label.dataType` | `Constant.type` / `SystemConstant.type` (see Rules 7–9) |
 
 > [!NOTE]
-> `Parameter` was originally listed here (Table 5.1), but ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does. Treated as a documentation error rather than something to implement against; removed from this rule's target list.
+> ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does. Treated as a documentation error rather than something to implement against; removed from this rule's target list.
 >
 > `SystemConstant` is implemented as a real, separate ASEM class (confirmed with the supervisor, no longer a "may be" guess). The discriminator: a constant=true `Label` carrying a `Tag` whose `name` or `tagType` is `"systemConstant"` (AMALTHEA's existing generic `ITaggable` mechanism) becomes a `SystemConstant`; otherwise it stays a plain `Constant`. This convention was chosen because no AMALTHEA field cleanly signals "system" vs. "plain" constant on its own, and the thesis figure (Table 5.1's original source) that might define the intended rule wasn't available.
 
@@ -481,6 +536,9 @@ Context amalthea::BaseTypeDefinition
 |---|---|
 | `BaseTypeDefinition.name` | `BooleanType.name` (e.g. `bool`, `boolean`) |
 
+> [!NOTE]
+> Reverse direction (ASEM `BooleanType` created → AMALTHEA `BaseTypeDefinition`): size is fixed at 1 bit, not asked for — the OCL constraint above pins it to exactly one valid value, so there's no real decision to make. Contrast with Rules 8/9 below, where the size is genuinely ambiguous and is asked for interactively.
+
 #### Rule 8 — BaseTypeDefinition (size∈{8,16,32}) ↔ UnsignedDiscreteType / SignedDiscreteType
 
 ```ocl
@@ -496,6 +554,9 @@ Context amalthea::BaseTypeDefinition
 > [!IMPORTANT]
 > Size 32 appears in both Rule 8 and Rule 9. Tie-breaker: if the alias contains `float` or `double` → Rule 9 (`ContinuousType`); otherwise → Rule 8 (`DiscreteType`).
 
+> [!NOTE]
+> Reverse direction (ASEM `UnsignedDiscreteType`/`SignedDiscreteType` created → AMALTHEA `BaseTypeDefinition`): 8/16/32 bit are all real, different types, and ASEM's classes don't carry a bit-width of their own — genuinely ambiguous, so the size is asked for interactively (Vitruv's `UserInteractor`, same mechanism as Rule 2's Task subtype dialog) rather than defaulted to 32 and silently losing information about narrower types.
+
 #### Rule 9 — BaseTypeDefinition (size∈{32,64}) ↔ ContinuousType
 
 ```ocl
@@ -508,17 +569,26 @@ Context amalthea::BaseTypeDefinition
 | `BaseTypeDefinition.name` | `ContinuousType.name` (e.g. `float32`, `double64`) |
 | `BaseTypeDefinition.aliases` | Alias containing `float`/`double` triggers this mapping |
 
+> [!NOTE]
+> Reverse direction (ASEM `ContinuousType` created → AMALTHEA `BaseTypeDefinition`): 32-bit (`float`) and 64-bit (`double`) are genuinely different types with different precision, not one type with cosmetic variation — asked for interactively, same as Rule 8, instead of defaulting to 64 and silently turning every `float` into a `double`.
+
+> [!NOTE]
+> Every `BaseTypeDefinition`'s `DataSize` is tagged back to its owner (`"dataSizeOwner"`, the same way used for Task priority in Rule 2) so a later `DataSize.value` change can find its way back without `eContainer`. The routine is idempotent by design (only tears down and rebuilds if the current ASEM type doesn't already match what the current size dispatches to) rather than trying to detect "is this really a later change" — the DSL fires `attribute replaced` identically for a genuine later change and for a value's very first assignment during initial object construction, so there's no reliable way to tell those apart from the event alone. See the comment above `resizeBaseType` in `AmaltheaToAsem.reactions` for the full story, including why an earlier version of this fix (without the idempotency check) broke previously-passing tests.
+>
+> **Edge case worth knowing about:** the alias — not just the size — decides Discrete vs. Continuous , and a resize never touches the alias, only the size. So a Discrete-family type (no `float`/`double` alias) can never *become* Continuous purely by resizing into 32/64 — it resizes into "nothing matches" instead: the old type is correctly removed, but no replacement gets built, since neither Rule 8 (alias says not-float/double) nor Rule 9 (needs a float/double alias) applies.
+
 #### Rule 10 — Array ↔ ComposedType
 
 - **OCL filter:** none — every `Array` maps to exactly one `ComposedType`
 
 | AMALTHEA | ASEM |
 |---|---|
-| `Array.numberElements` | `ComposedType` size (element count) |
+| `Array.numberElements` | `ComposedType.numberElements` |
 | `Array.dataType` | `ComposedType.primitiveType` (element type) |
 
-> [!WARNING]
-> A dedicated `ArrayType` class is referenced in Table 5.1 but does not appear in the provided ASEM ecore. `ComposedType` with a `primitiveType` reference is the closest structural equivalent.
+
+> [!NOTE]
+> `ComposedType.numberElements` (`EInt`, added to `asem.ecore`) now implements P12 (see §3.4): the element count is copied on creation in both directions and kept in sync afterwards — changing `Array.numberElements` in AMALTHEA updates the corresponding `ComposedType`, and vice versa.
 ### 3.3 OCL Invariant Summary
 
 ```ocl
@@ -562,6 +632,7 @@ Context asem::classifiers::Module
 
 Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **Structural (S)**, and **Completeness (C)**.
 
+
 #### Existence Rules — element creation and deletion
 
 | ID | Trigger | Action |
@@ -574,15 +645,31 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | E6 | AMALTHEA `Runnable` deleted | delete corresponding ASEM `Method` from `Module.methods` |
 | E7 | ASEM `Method` created (void, no params) | create AMALTHEA `Runnable` with same name; add to `Component.runnables` |
 | E8 | ASEM `Method` deleted | delete corresponding AMALTHEA `Runnable` |
-| E9 | AMALTHEA `Label` (constant=false) created | create ASEM `Message` with same name; add to `Module.typedElements` |
-| E10 | AMALTHEA `Label` (constant=true) created | create ASEM `Constant` with same name; add to `Module.typedElements` |
-| E11 | AMALTHEA `Label` deleted | delete corresponding ASEM `Message` or `Constant` |
+| E9 | AMALTHEA `Label` (constant=false) created | create ASEM `Message` (mixed/no access yet), `Input` (read-only), or `Output` (write-only) — disambiguated via `LabelAccess`, see Rule 6 |
+| E10 | AMALTHEA `Label` (constant=true) created | create ASEM `Constant`, or `SystemConstant` if tagged `"systemConstant"` — see Rule 5 |
+| E11 | AMALTHEA `Label` deleted | delete whichever of `Message`/`Constant`/`Input`/`Output`/`SystemConstant` currently corresponds |
 | E12 | ASEM `Message` created | create AMALTHEA `Label` (constant=false) with same name |
 | E13 | ASEM `Constant` created | create AMALTHEA `Label` (constant=true) with same name |
 | E14 | AMALTHEA `BaseTypeDefinition` (size=1) created | create ASEM `BooleanType` with same name |
 | E15 | AMALTHEA `BaseTypeDefinition` (size∈{8,16,32}) created | create `UnsignedDiscreteType` or `SignedDiscreteType` (disambiguate via alias) |
 | E16 | AMALTHEA `BaseTypeDefinition` (size∈{32,64}, float alias) created | create ASEM `ContinuousType` with same name |
 | E17 | AMALTHEA `Array` created | create ASEM `ComposedType`; set size from `numberElements` |
+| E18 | AMALTHEA `Task` created | interactively create one ASEM `InitTask`/`SoftwareTask`/`PeriodicTask`/`TimeTableTask` — see Rule 2 |
+| E19 | AMALTHEA `Task` deleted | delete corresponding ASEM Task subtype |
+| E20 | AMALTHEA `ISR` created | create ASEM `InterruptTask` with same name — Rule 3 |
+| E21 | AMALTHEA `ISR` deleted | delete corresponding ASEM `InterruptTask` |
+| E22 | ASEM `InitTask`/`SoftwareTask`/`PeriodicTask`/`TimeTableTask` created | create AMALTHEA `Task` with same name |
+| E23 | ASEM `InitTask`/`SoftwareTask`/`PeriodicTask`/`TimeTableTask` deleted | delete corresponding AMALTHEA `Task` |
+| E24 | ASEM `InterruptTask` created | create AMALTHEA `ISR` with same name |
+| E25 | ASEM `InterruptTask` deleted | delete corresponding AMALTHEA `ISR` |
+| E26 | ASEM `Input` created | create AMALTHEA `Label` (constant=false) with same name |
+| E27 | ASEM `Output` created | create AMALTHEA `Label` (constant=false) with same name |
+| E28 | ASEM `SystemConstant` created | create AMALTHEA `Label` (constant=true), tagged `"systemConstant"` |
+| E29 | ASEM `BooleanType` created | create AMALTHEA `BaseTypeDefinition` (size=1) — reverse of Rule 7 |
+| E30 | ASEM `UnsignedDiscreteType`/`SignedDiscreteType` created | create AMALTHEA `BaseTypeDefinition`, size asked interactively — reverse of Rule 8 |
+| E31 | ASEM `ContinuousType` created | create AMALTHEA `BaseTypeDefinition`, size asked interactively — reverse of Rule 9 |
+| E32 | ASEM `ComposedType` created | create AMALTHEA `Array` — reverse of Rule 10 |
+| E33 🆕 | AMALTHEA `SWModel` created | create ASEM `PrimitiveTypeRepository`, named `"PrimitiveTypes"` — not part of R1–R10, see §2.4 |
 
 #### Property Rules — attribute value changes
 
@@ -592,14 +679,21 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | P2 | `Module.name` changed | set `Component.name` = new name |
 | P3 | `Runnable.name` changed | set `Method.name` = new name |
 | P4 | `Method.name` changed | set `Runnable.name` = new name |
-| P5 | `Label.name` changed | set corresponding `Message.name` or `Constant.name` = new name |
+| P5 | `Label.name` changed | set the corresponding `Message`/`Constant`/`Input`/`Output`/`SystemConstant`'s `.name` = new name |
 | P6 | `Message.name` changed | set `Label.name` = new name |
 | P7 | `Constant.name` changed | set `Label.name` = new name |
-| P8 | `Label.constant` changed false → true | replace ASEM `Message` with `Constant`; update correspondence |
-| P9 | `Label.constant` changed true → false | replace ASEM `Constant` with `Message`; update correspondence |
+| P8 | `Label.constant` changed false → true | replace ASEM `Message`/`Input`/`Output` with `Constant` or `SystemConstant`; update correspondence |
+| P9 | `Label.constant` changed true → false | replace ASEM `Constant`/`SystemConstant` with `Message`/`Input`/`Output`; update correspondence |
 | P10 | `Label.dataType` changed | update `Message.type` / `Constant.type` to corresponding ASEM `PrimitiveType` |
-| P11 | `BaseTypeDefinition.size` changed | replace ASEM `PrimitiveType` with type matching new size (re-apply Rules 7–9) |
-| P12 | `Array.numberElements` changed | update `ComposedType` size attribute |
+| P11 🆕 | `BaseTypeDefinition.size` changed | replace ASEM `PrimitiveType` with type matching new size (re-apply Rules 7–9) — **implemented**, see NOTE on P11 above and in `AmaltheaToAsem.reactions` |
+| P12 🆕 | `Array.numberElements` changed | update `ComposedType.numberElements`, and vice versa — **implemented**, both directions |
+| P13 | `Task.name` changed | set corresponding ASEM Task subtype's `.name` = new name |
+| P14 | `ISR.name` changed | set `InterruptTask.name` = new name |
+| P15 | ASEM Task subtype `.name` changed | set AMALTHEA `Task.name` = new name |
+| P16 | ASEM `InterruptTask.name` changed | set AMALTHEA `ISR.name` = new name |
+| P17 | ASEM `Input`/`Output`/`SystemConstant` `.name` changed | set corresponding `Label.name` = new name |
+| P18 🆕 | `PeriodicTask.period` changed | update `PeriodicStimulus.recurrence` (milliseconds) — see NOTE on Rule 2 above |
+| P19 🆕 | `PeriodicTask.delay` changed | update `PeriodicStimulus.offset` (milliseconds) |
 
 #### Structural Rules — containment and reference changes
 
@@ -609,10 +703,12 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | S2 | `Runnable` removed from `Component.runnables` | remove corresponding ASEM `Method` from `Module.methods` |
 | S3 | `Method` added to `Module.methods` | add corresponding AMALTHEA `Runnable` to `Component.runnables` |
 | S4 | `Method` removed from `Module.methods` | remove corresponding AMALTHEA `Runnable` from `Component.runnables` |
-| S5 | `Label` added to `Component.labels` | add corresponding ASEM `Message` (or `Constant`) to `Module.typedElements` |
+| S5 | `Label` added to `Component.labels` | add corresponding ASEM element (`Message`/`Constant`/`Input`/`Output`/`SystemConstant`) to `Module.typedElements` |
 | S6 | `Label` removed from `Component.labels` | remove corresponding ASEM element from `Module.typedElements` |
 | S7 | `Message` added to `Module.typedElements` | add corresponding AMALTHEA `Label` (constant=false) to `Component.labels` |
 | S8 | `Constant` added to `Module.typedElements` | add corresponding AMALTHEA `Label` (constant=true) to `Component.labels` |
+| S9 | `LabelAccess` inserted into `Label.labelAccesses` | retroactively swap ASEM `Message` ↔ `Input`/`Output` once the read/write pattern becomes known — see Rule 6 |
+| S10 🆕 | `PeriodicStimulus` inserted into `Task.stimuli` | sync `PeriodicTask.period`/`delay` from `recurrence`/`offset` — see NOTE on Rule 2 above |
 
 #### Completeness Rules — model-wide invariants
 
@@ -620,12 +716,15 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 |---|---|
 | C1 | Every `Component` has a corresponding `Module`, and vice versa |
 | C2 | Every `Runnable` in a `Component` has a corresponding void no-param `Method` in the corresponding `Module`, and vice versa |
-| C3 | Every `Label` (constant=false) in a `Component` has a corresponding `Message` in `Module.typedElements`, and vice versa |
-| C4 | Every `Label` (constant=true) in a `Component` has a corresponding `Constant` in `Module.typedElements`, and vice versa |
+| C3 | Every `Label` (constant=false) in a `Component` has a corresponding `Message`/`Input`/`Output` in `Module.typedElements`, and vice versa |
+| C4 | Every `Label` (constant=true) in a `Component` has a corresponding `Constant`/`SystemConstant` in `Module.typedElements`, and vice versa |
 | C5 | Every `BaseTypeDefinition` (size=1) has a corresponding `BooleanType`, and vice versa |
 | C6 | Every `BaseTypeDefinition` (size∈{8,16,32}) has a corresponding `DiscreteType`, and vice versa |
 | C7 | Every `BaseTypeDefinition` (size∈{32,64}, float alias) has a corresponding `ContinuousType`, and vice versa |
 | C8 | Every `Array` has a corresponding `ComposedType`; `Array.numberElements` must equal `ComposedType` size, and vice versa |
+| C9 | Every `Task` has a corresponding ASEM Task subtype, and vice versa |
+| C10 | Every `ISR` has a corresponding `InterruptTask`, and vice versa |
+| C11 🆕 | Exactly one `PrimitiveTypeRepository` exists per model, corresponding to the model's `SWModel` |
 
 ---
 

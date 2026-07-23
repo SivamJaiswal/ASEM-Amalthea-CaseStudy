@@ -22,8 +22,11 @@
       <eStructuralFeatures xsi:type="ecore:EReference" name="methods" upperBound="-1"
           eType="#//dataexchange/Method" containment="true" resolveProxies="false"/>
     </eClassifiers>
+    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="ComposedType" eSuperTypes="#//classifiers/Classifier">
       <eStructuralFeatures xsi:type="ecore:EReference" name="primitiveType" eType="#//primitivetypes/PrimitiveType"/>
+      <eStructuralFeatures xsi:type="ecore:EAttribute" name="numberElements" unique="false"
+          defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
     </eClassifiers>
     <eClassifiers xsi:type="ecore:EClass" name="Component" abstract="true" eSuperTypes="#//base/Identifiable #//classifiers/Classifier #//base/Named">
       <eStructuralFeatures xsi:type="ecore:EReference" name="typedElements" upperBound="-1"
@@ -38,6 +41,19 @@
     </eClassifiers>
     <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="InterruptTask" eSuperTypes="#//classifiers/Task"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="InitTask" eSuperTypes="#//classifiers/Task"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="SoftwareTask" eSuperTypes="#//classifiers/Task"/>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="PeriodicTask" eSuperTypes="#//classifiers/Task">
+      <eStructuralFeatures xsi:type="ecore:EAttribute" name="period" unique="false"
+          defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+      <eStructuralFeatures xsi:type="ecore:EAttribute" name="delay" unique="false"
+          defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+    </eClassifiers>
+    <!-- changes made by uskui -->
+    <eClassifiers xsi:type="ecore:EClass" name="TimeTableTask" eSuperTypes="#//classifiers/Task"/>
   </eSubpackages>
   <eSubpackages name="dataexchange" nsURI="edu.kit.ipd.sdq.metamodels.asem.dataexchange"
       nsPrefix="dataexchange">
