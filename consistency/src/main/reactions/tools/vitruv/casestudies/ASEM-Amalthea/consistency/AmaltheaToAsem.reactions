@@ -4,10 +4,11 @@ import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
 
 // Change propagation: AMALTHEA (APP4MC 3.3.0) --> ASEM (KIT)
-// Existence rules  : E1, E2, E5, E6, E9(a/b/c), E10(a/b), E11, E14, E15, E16, E17,
+// Existence rules  : E1, E2, E5, E6, E9, E10, E11, E14, E15, E16, E17,
 //                    E18, E19, E20, E21, E33
 // Property rules   : P1, P3, P5, P8, P9, P11, P13, P14, P18, P19
-// Structural rules : S5, S6 (absorbed into E9/E10/E11 — see SECTION 3), S9, S10
+// Structural rules : S1, S2 (absorbed into E5/E6 — see SECTION 2),
+//                    S5, S6 (absorbed into E9/E10/E11 — see SECTION 3), S9, S10
 // See README.md §3.4 for the full rule table this maps onto.
 // Correspondences are created here; AsemToAmalthea.reactions only looks them up.
 
@@ -35,9 +36,6 @@ routine createModuleForComponent(am::Component component) {
     }
     update {
         module.name = component.name
-        // Dummy has no containment feature for Modules, so the Module must be
-        // persisted as its own resource root (anchored to the already-persisted
-        // Component) — otherwise it's dangling the moment a later change touches it.
         persistProjectRelative(component, module, "asem/module_" + component.name + ".asem")
         addCorrespondenceBetween(component, module)
     }
@@ -136,14 +134,14 @@ routine syncRunnableNameToMethod(am::Runnable runnable) {
 
 
 
-// SECTION 3 — Label ↔ Message / Constant   
+// SECTION 3 — Label ↔ Message / Constant
 //
 // Label constant=false → Message   (Rule 6)
 // Label constant=true  → Constant  (Rule 5)
 
 
 
-// E9a — non-constant Label, read-only accesses → Input
+// E9 — non-constant Label, read-only accesses → Input
 reaction InputLabelCreated {
     after element am::Label created
         with affectedEObject.constant == false
@@ -162,12 +160,13 @@ routine createInputForLabel(am::Label label) {
     }
     update {
         input.name = label.name
+        input.constant = false
         module.typedElements += input
         addCorrespondenceBetween(label, input)
     }
 }
 
-// E9b — non-constant Label, write-only accesses → Output
+// E9 — non-constant Label, write-only accesses → Output
 reaction OutputLabelCreated {
     after element am::Label created
         with affectedEObject.constant == false
@@ -186,12 +185,13 @@ routine createOutputForLabel(am::Label label) {
     }
     update {
         output.name = label.name
+        output.constant = false
         module.typedElements += output
         addCorrespondenceBetween(label, output)
     }
 }
 
-// E9c — non-constant Label, mixed/no accesses yet → Message (fallback, unchanged behavior)
+// E9 — non-constant Label, mixed/no accesses yet → Message
 reaction MessageLabelCreated {
     after element am::Label created
         with affectedEObject.constant == false
@@ -211,12 +211,14 @@ routine createMessageForLabel(am::Label label) {
     }
     update {
         message.name = label.name
+        message.constant = false
         module.typedElements += message
         addCorrespondenceBetween(label, message)
     }
 }
 
 
+// S9 — LabelAccess inserted -> retroactive Message replaced by Input/Output
 reaction LabelAccessCreated {
     after element am::LabelAccess created
         with affectedEObject.data !== null
@@ -243,6 +245,7 @@ routine resyncLabelVariableKind(am::LabelAccess labelAccess) {
             removeObject(message)
             removeCorrespondenceBetween(label, message)
             input.name = label.name
+            input.constant = false
             module.typedElements += input
             addCorrespondenceBetween(label, input)
         } else if (isWriteOnly) {
@@ -250,6 +253,7 @@ routine resyncLabelVariableKind(am::LabelAccess labelAccess) {
             removeObject(message)
             removeCorrespondenceBetween(label, message)
             output.name = label.name
+            output.constant = false
             module.typedElements += output
             addCorrespondenceBetween(label, output)
         }
@@ -257,7 +261,7 @@ routine resyncLabelVariableKind(am::LabelAccess labelAccess) {
 }
 
 
-// E10a — constant Label tagged "systemConstant" → SystemConstant
+// E10 — constant Label tagged "systemConstant" → SystemConstant
 reaction SystemConstantLabelCreated {
     after element am::Label created
         with affectedEObject.constant == true
@@ -275,12 +279,13 @@ routine createSystemConstantForLabel(am::Label label) {
     }
     update {
         systemConstant.name = label.name
+        systemConstant.constant = true
         module.typedElements += systemConstant
         addCorrespondenceBetween(label, systemConstant)
     }
 }
 
-// E10b — constant Label, no systemConstant tag → Constant (unchanged default behavior)
+// E10 — constant Label, no systemConstant tag → Constant
 reaction ConstantLabelCreated {
     after element am::Label created
         with affectedEObject.constant == true
@@ -298,6 +303,7 @@ routine createConstantForLabel(am::Label label) {
     }
     update {
         constant.name = label.name
+        constant.constant = true
         module.typedElements += constant
         addCorrespondenceBetween(label, constant)
     }
@@ -430,7 +436,7 @@ routine syncLabelName(am::Label label) {
     }
 }
 
-// P8 — Label.constant flipped false→true: replace Message/Input/Output with
+// P8 — Label.constant flipped false→true -> replace Message/Input/Output with Constant/SystemConstant
 reaction LabelFlippedToConstant {
     after attribute replaced at am::Label[constant]
         with affectedEObject.constant == true
@@ -454,10 +460,12 @@ routine swapMessageToConstant(am::Label label) {
         val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
         if (isSystemConstant) {
             newSystemConstant.name = label.name
+            newSystemConstant.constant = true
             module.typedElements += newSystemConstant
             addCorrespondenceBetween(label, newSystemConstant)
         } else {
             newConstant.name = label.name
+            newConstant.constant = true
             module.typedElements += newConstant
             addCorrespondenceBetween(label, newConstant)
         }
@@ -480,10 +488,12 @@ routine swapInputToConstant(am::Label label) {
         val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
         if (isSystemConstant) {
             newSystemConstant.name = label.name
+            newSystemConstant.constant = true
             module.typedElements += newSystemConstant
             addCorrespondenceBetween(label, newSystemConstant)
         } else {
             newConstant.name = label.name
+            newConstant.constant = true
             module.typedElements += newConstant
             addCorrespondenceBetween(label, newConstant)
         }
@@ -506,10 +516,12 @@ routine swapOutputToConstant(am::Label label) {
         val isSystemConstant = label.tags.exists[name == "systemConstant" || tagType == "systemConstant"]
         if (isSystemConstant) {
             newSystemConstant.name = label.name
+            newSystemConstant.constant = true
             module.typedElements += newSystemConstant
             addCorrespondenceBetween(label, newSystemConstant)
         } else {
             newConstant.name = label.name
+            newConstant.constant = true
             module.typedElements += newConstant
             addCorrespondenceBetween(label, newConstant)
         }
@@ -544,6 +556,7 @@ routine swapConstantOnlyToMessage(am::Label label) {
         removeObject(constant)
         removeCorrespondenceBetween(label, constant)
         newMessage.name = label.name
+        newMessage.constant = false
         module.typedElements += newMessage
         addCorrespondenceBetween(label, newMessage)
     }
@@ -562,6 +575,7 @@ routine swapSystemConstantToMessage(am::Label label) {
         removeObject(systemConstant)
         removeCorrespondenceBetween(label, systemConstant)
         newMessage.name = label.name
+        newMessage.constant = false
         module.typedElements += newMessage
         addCorrespondenceBetween(label, newMessage)
     }
@@ -575,7 +589,7 @@ routine swapConstantToMessage(am::Label label) {
 }
 
 
-// SECTION 4 — BaseTypeDefinition ↔ PrimitiveType  
+// SECTION 4 — BaseTypeDefinition ↔ PrimitiveType
 //
 // Overlap at size=32: alias containing "float" or "double" → ContinuousType,
 // otherwise → DiscreteType.
@@ -683,7 +697,7 @@ routine createContinuousType(am::BaseTypeDefinition btd) {
     }
 }
 
-// P11 (BaseTypeDefinition.size changed → remove old primitive, create new one):
+// Shared helper — creates the BooleanType/DiscreteType/ContinuousType matching btd.size.
 routine dispatchPrimitiveTypeCreation(am::BaseTypeDefinition btd) {
     update {
         if (btd.size !== null && btd.size.value.intValue == 1) {
@@ -704,6 +718,7 @@ routine dispatchPrimitiveTypeCreation(am::BaseTypeDefinition btd) {
     }
 }
 
+// P11 — BaseTypeDefinition.size changed -> remove old PrimitiveType, create new one
 reaction BaseTypeSizeChanged {
     after attribute replaced at am::DataSize[value]
     call resizeBaseType(affectedEObject)
@@ -726,9 +741,6 @@ routine resizeBaseType(am::DataSize size) {
             && (btd.size.value.intValue == 32 || btd.size.value.intValue == 64)
             && btd.aliases.exists[alias.toLowerCase.contains("float")
                                || alias.toLowerCase.contains("double")]
-        // "instanceof asem_p::X" doesn't parse in this DSL (the Package::Type alias syntax
-        // isn't accepted in instanceof position, only after "new") — compare EClass names
-        // instead, which sidesteps the parsing issue entirely.
         val String oldTypeName = oldPrimitiveType.eClass.name
         val boolean alreadyCorrect =
             (sizeIsOne && oldTypeName == "BooleanType")
@@ -745,9 +757,10 @@ routine resizeBaseType(am::DataSize size) {
 
 
 
-// SECTION 4b — SWModel ↔ PrimitiveTypeRepository   (new correspondence, not part of R1–R10)
+// SECTION 4b — SWModel ↔ PrimitiveTypeRepository   (new correspondence)
 
 
+// E33 — SWModel created -> create PrimitiveTypeRepository
 reaction SWModelCreated {
     after element am::SWModel created
     call createPrimitiveTypeRepositoryForSWModel(affectedEObject)
@@ -785,14 +798,8 @@ routine createComposedTypeForArray(am::Array array) {
         val composedType = new asem_c::ComposedType
     }
     update {
-        // name the ComposedType after the Array itself (not the DataTypeDefinition)
-        // because eContainer access in update blocks is not supported in this DSL version
-        // Array has no name attribute in AMALTHEA — name is set from the test/caller
         composedType.name = "ComposedType"
         composedType.numberElements = array.numberElements
-        // Array has no name attribute to key a per-object file on, and Dummy has no
-        // containment feature for ComposedTypes, so all of them are persisted as
-        // independent roots sharing one resource (persistAsRoot appends, not overwrites).
         persistProjectRelative(array, composedType, "asem/composedtypes.asem")
         addCorrespondenceBetween(array, composedType)
     }
@@ -817,7 +824,7 @@ routine syncArrayNumberElementsToComposedType(am::Array array) {
 // SECTION 6 — Task/ISR ↔ Task/InterruptTask   (Rules 2 & 3)
 
 
-// Task created → ask which ASEM Task subtype it should become, then create it
+// E18 — Task created -> ask which ASEM Task subtype it should become, then create it
 reaction TaskCreated {
     after element am::Task created
     call createTaskForTask(affectedEObject)
@@ -888,7 +895,7 @@ routine createTimeTableTaskForTask(am::Task task) {
     }
 }
 
-// ISR created → create an ASEM InterruptTask (Rule 3: unconditional 1:1)
+// E20 — ISR created -> create an ASEM InterruptTask
 reaction ISRCreated {
     after element am::ISR created
     call createInterruptTaskForISR(affectedEObject)
@@ -908,7 +915,7 @@ routine createInterruptTaskForISR(am::ISR isr) {
     }
 }
 
-// Task deleted → delete corresponding ASEM Task
+// E19 — Task deleted -> delete corresponding ASEM Task
 reaction TaskDeleted {
     after element am::Task deleted
     call deleteTaskForTask(affectedEObject)
@@ -924,7 +931,7 @@ routine deleteTaskForTask(am::Task task) {
     }
 }
 
-// ISR deleted → delete corresponding ASEM InterruptTask
+// E21 — ISR deleted -> delete corresponding ASEM InterruptTask
 reaction ISRDeleted {
     after element am::ISR deleted
     call deleteInterruptTaskForISR(affectedEObject)
@@ -940,7 +947,7 @@ routine deleteInterruptTaskForISR(am::ISR isr) {
     }
 }
 
-// Task.name changed → update ASEM Task.name
+// P13 — Task.name changed -> update ASEM Task.name
 reaction TaskRenamed {
     after attribute replaced at am::Task[name]
     call syncTaskNameToAsemTask(affectedEObject)
@@ -955,7 +962,7 @@ routine syncTaskNameToAsemTask(am::Task task) {
     }
 }
 
-// ISR.name changed → update ASEM InterruptTask.name
+// P14 — ISR.name changed -> update ASEM InterruptTask.name
 reaction ISRRenamed {
     after attribute replaced at am::ISR[name]
     call syncISRNameToInterruptTask(affectedEObject)
@@ -970,8 +977,7 @@ routine syncISRNameToInterruptTask(am::ISR isr) {
     }
 }
 
-// RunnableCall created → append the called Method to the caller's Task.processes.
-
+// Rule 2 note — RunnableCall populates Task.processes 
 reaction RunnableCallCreated {
     after element am::RunnableCall created
     call linkMethodToTaskProcesses(affectedEObject)
@@ -987,6 +993,7 @@ routine linkMethodToTaskProcesses(am::RunnableCall runnableCall) {
     }
 }
 
+// Rule 2 note — Task priority correspondence 
 reaction TaskAllocationCreated {
     after element am::TaskAllocation created
     call linkTaskPriorityCorrespondence(affectedEObject)
@@ -1005,7 +1012,7 @@ routine linkTaskPriorityCorrespondence(am::TaskAllocation taskAllocation) {
     }
 }
 
-// ISR priority — simpler than Task: ISRAllocation.priority is a plain int, no map lookup.
+// Rule 3 note — ISR priority correspondence
 reaction ISRAllocationCreated {
     after element am::ISRAllocation created
     call linkIsrPriorityCorrespondence(affectedEObject)
@@ -1020,7 +1027,7 @@ routine linkIsrPriorityCorrespondence(am::ISRAllocation isrAllocation) {
     }
 }
 
-// PeriodicTask.period/delay <-> PeriodicStimulus.recurrence/offset.
+// S10 — PeriodicStimulus inserted into Task.stimuli -> sync PeriodicTask.period/delay
 reaction PeriodicStimulusAddedToTask {
     after element am::PeriodicStimulus inserted in am::Task[stimuli]
     call syncPeriodicTaskTiming(affectedEObject, newValue)
@@ -1053,6 +1060,27 @@ routine syncPeriodicTaskTiming(am::Task task, am::PeriodicStimulus stimulus) {
             periodicTask.delay = stimulus.offset.value.intValue / 1000000000
         } else {
             periodicTask.delay = stimulus.offset.value.intValue
+        }
+        // Tag recurrence and offset to the owning Task.
+        addCorrespondenceBetween(stimulus.recurrence, task, "periodicStimulusOwner")
+        addCorrespondenceBetween(stimulus.offset, task, "periodicStimulusOwner")
+    }
+}
+
+// P18, P19 — Time.value changed on an attached PeriodicStimulus -> re-sync PeriodicTask.period/delay.
+reaction PeriodicStimulusTimeChanged {
+    after attribute replaced at am::Time[value]
+    call resyncPeriodicTaskTimingFromTimeChange(affectedEObject)
+}
+
+routine resyncPeriodicTaskTimingFromTimeChange(am::Time time) {
+    match {
+        val task = retrieve am::Task corresponding to time
+    }
+    update {
+        val stimulus = task.stimuli.filter(typeof(org.eclipse.app4mc.amalthea.model.PeriodicStimulus)).head
+        if (stimulus !== null && (time == stimulus.recurrence || time == stimulus.offset)) {
+            syncPeriodicTaskTiming(task, stimulus)
         }
     }
 }

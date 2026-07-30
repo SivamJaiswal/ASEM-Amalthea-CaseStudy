@@ -17,3 +17,6 @@ plugin.properties
 # Personal notes
 CLAUDE.md
 docs/
+
+# Generated sample data (build locally via VSUMSampleDataGenerator — see README §4.1)
+vsum/sample-data/

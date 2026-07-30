@@ -9,25 +9,15 @@ import org.eclipse.app4mc.amalthea.model.BaseTypeDefinition;
 import org.eclipse.app4mc.amalthea.model.Component;
 import org.eclipse.app4mc.amalthea.model.ISR;
 import org.eclipse.app4mc.amalthea.model.Label;
-import org.eclipse.app4mc.amalthea.model.PeriodicStimulus;
 import org.eclipse.app4mc.amalthea.model.Runnable;
-import org.eclipse.app4mc.amalthea.model.TimeUnit;
 
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.ComposedType;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.InitTask;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.SoftwareTask;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.PeriodicTask;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.TimeTableTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Module;
-import edu.kit.ipd.sdq.metamodels.asem.classifiers.Task;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Constant;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Input;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Message;
 import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Method;
-import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.BooleanType;
-import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.ContinuousType;
-import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.SignedDiscreteType;
-import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.UnsignedDiscreteType;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.Output;
+import edu.kit.ipd.sdq.metamodels.asem.dataexchange.SystemConstant;
 
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
@@ -36,12 +26,10 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.vitruv.framework.vsum.internal.InternalVirtualModel;
 
 /**
- * AsemToAmaltheaTest
- *
- * Tests all E and P rules where changes originate on the ASEM side.
+ * Tests Existence rules (E1-E33) where changes originate on the ASEM side.
  */
 @TestMethodOrder(MethodOrderer.DisplayName.class)
-public class AsemToAmaltheaTest {
+public class AsemToAmaltheaExistenceTest {
 
     VSUMRunner util = new VSUMRunner();
 
@@ -79,21 +67,6 @@ public class AsemToAmaltheaTest {
 
         assertNull(util.getCorrespondingInAmalthea(vsum, "OilPressure", Component.class),
                 "Component must be removed");
-    }
-
-    // P2 — Module.name → Component.name
-
-    @Test
-    @DisplayName("P2 – Module renamed → Component name updated")
-    void p2_moduleRenamed_componentNameUpdated(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addModule(vsum, tempDir, "InitialName");
-        util.renameInAsem(vsum, "InitialName", Module.class, "UpdatedName");
-
-        assertNull(util.getCorrespondingInAmalthea(vsum, "InitialName", Component.class));
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "UpdatedName", Component.class));
     }
 
     // E7 / E8 — Method ↔ Runnable
@@ -145,22 +118,6 @@ public class AsemToAmaltheaTest {
                 "Runnable must be removed");
     }
 
-    // P4 — Method.name → Runnable.name
-
-    @Test
-    @DisplayName("P4 – Method renamed → Runnable name updated")
-    void p4_methodRenamed_runnableNameUpdated(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addModule(vsum, tempDir, "MCU");
-        util.addVoidMethod(vsum, "MCU", "oldOp");
-        util.renameInAsem(vsum, "oldOp", Method.class, "newOp");
-
-        assertNull(util.getCorrespondingInAmalthea(vsum, "oldOp", Runnable.class));
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "newOp", Runnable.class));
-    }
-
     // E12 — Message → Label (constant=false)
 
     @Test
@@ -203,80 +160,93 @@ public class AsemToAmaltheaTest {
                 .anyMatch(l -> label.getName().equals(l.getName())));
     }
 
-    // P6 / P7 — name propagation
+    // E34 — Message/Constant/Input/Output/SystemConstant deleted → Label deleted
 
     @Test
-    @DisplayName("P6 – Message renamed → Label name updated")
-    void p6_messageRenamed_labelNameUpdated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E34 – Message deleted → Label removed")
+    void e11_messageDeleted_labelRemoved(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
-        util.addModule(vsum, tempDir, "CAN_Node");
-        util.addMessage(vsum, "CAN_Node", "oldFrame");
-        util.renameInAsem(vsum, "oldFrame", Message.class, "newFrame");
+        util.addModule(vsum, tempDir, "SignalModule");
+        util.addMessage(vsum, "SignalModule", "signalX");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "signalX", Label.class));
 
-        assertNull(util.getCorrespondingInAmalthea(vsum, "oldFrame", Label.class));
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "newFrame", Label.class));
+        util.deleteFromAsem(vsum, "signalX", Message.class);
+
+        assertNull(util.getCorrespondingInAmalthea(vsum, "signalX", Label.class),
+                "Label must be removed");
     }
 
     @Test
-    @DisplayName("P7 – Constant renamed → Label name updated")
-    void p7_constantRenamed_labelNameUpdated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E34 – Constant deleted → Label removed")
+    void e11_constantDeleted_labelRemoved(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
-        util.addModule(vsum, tempDir, "LIN_Node");
-        util.addConstant(vsum, "LIN_Node", "OLD_PARAM");
-        util.renameInAsem(vsum, "OLD_PARAM", Constant.class, "NEW_PARAM");
+        util.addModule(vsum, tempDir, "ConfigModule");
+        util.addConstant(vsum, "ConfigModule", "MAX_VAL");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "MAX_VAL", Label.class));
 
-        assertNull(util.getCorrespondingInAmalthea(vsum, "OLD_PARAM", Label.class));
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "NEW_PARAM", Label.class));
+        util.deleteFromAsem(vsum, "MAX_VAL", Constant.class);
+
+        assertNull(util.getCorrespondingInAmalthea(vsum, "MAX_VAL", Label.class),
+                "Label must be removed");
     }
 
-    // Bidirectional round-trip
-
     @Test
-    @DisplayName("Bidirectional – Component/Module names stay in sync after alternating renames")
-    void bidirectional_componentModule_alternatingRenames(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E34 – Input deleted → Label removed")
+    void e11_inputDeleted_labelRemoved(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
-        util.addComponent(vsum, "Start");
-        assertNotNull(util.getCorrespondingInAsem(vsum, "Start", Module.class));
+        util.addModule(vsum, tempDir, "SensorModule");
+        util.addInput(vsum, "SensorModule", "inSignal");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "inSignal", Label.class));
 
-        // rename from AMALTHEA side
-        util.renameInAmalthea(vsum, "Start", Component.class, "Middle");
-        assertNotNull(util.getCorrespondingInAsem(vsum, "Middle", Module.class),
-                "Module must follow Component rename");
+        util.deleteFromAsem(vsum, "inSignal", Input.class);
 
-        // rename from ASEM side
-        util.renameInAsem(vsum, "Middle", Module.class, "End");
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "End", Component.class),
-                "Component must follow Module rename");
+        assertNull(util.getCorrespondingInAmalthea(vsum, "inSignal", Label.class),
+                "Label must be removed");
     }
 
     @Test
-    @DisplayName("Bidirectional – Runnable/Method names stay in sync after alternating renames")
-    void bidirectional_runnableMethod_alternatingRenames(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E34 – Output deleted → Label removed")
+    void e11_outputDeleted_labelRemoved(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
-        util.addComponent(vsum, "BiDir");
-        util.addRunnable(vsum, "BiDir", "initial");
-        assertNotNull(util.getCorrespondingInAsem(vsum, "initial", Method.class));
+        util.addModule(vsum, tempDir, "ActuatorModule");
+        util.addOutput(vsum, "ActuatorModule", "outSignal");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "outSignal", Label.class));
 
-        util.renameInAmalthea(vsum, "initial", Runnable.class, "fromAmalthea");
-        assertNotNull(util.getCorrespondingInAsem(vsum, "fromAmalthea", Method.class));
+        util.deleteFromAsem(vsum, "outSignal", Output.class);
 
-        util.renameInAsem(vsum, "fromAmalthea", Method.class, "fromAsem");
-        assertNotNull(util.getCorrespondingInAmalthea(vsum, "fromAsem", Runnable.class));
+        assertNull(util.getCorrespondingInAmalthea(vsum, "outSignal", Label.class),
+                "Label must be removed");
     }
 
-    // R2 / R3 (reverse) — ASEM Task/InterruptTask → AMALTHEA Task/ISR
+    @Test
+    @DisplayName("E34 – SystemConstant deleted → Label removed")
+    void e11_systemConstantDeleted_labelRemoved(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addModule(vsum, tempDir, "CalibModule");
+        util.addSystemConstant(vsum, "CalibModule", "SYS_MAX");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "SYS_MAX", Label.class));
+
+        util.deleteFromAsem(vsum, "SYS_MAX", SystemConstant.class);
+
+        assertNull(util.getCorrespondingInAmalthea(vsum, "SYS_MAX", Label.class),
+                "Label must be removed");
+    }
+
+    // E22-E25 — ASEM Task/InterruptTask → AMALTHEA Task/ISR
 
     @Test
-    @DisplayName("R2 (reverse) – ASEM Task created → AMALTHEA Task exists")
-    void r2_asemTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E22 – ASEM Task created → AMALTHEA Task exists")
+    void e22_asemTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -289,8 +259,26 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R3 (reverse) – ASEM InterruptTask created → AMALTHEA ISR exists")
-    void r3_asemInterruptTaskCreated_isrCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E23 – ASEM Task deleted → AMALTHEA Task removed")
+    void e23_asemTaskDeleted_taskRemoved(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemTask(vsum, tempDir, "reverseTaskToDelete");
+        assertNotNull(util.getCorrespondingInAmalthea(
+                vsum, "reverseTaskToDelete", org.eclipse.app4mc.amalthea.model.Task.class));
+
+        util.deleteFromAsem(vsum, "reverseTaskToDelete",
+                edu.kit.ipd.sdq.metamodels.asem.classifiers.Task.class);
+
+        assertNull(util.getCorrespondingInAmalthea(
+                vsum, "reverseTaskToDelete", org.eclipse.app4mc.amalthea.model.Task.class),
+                "AMALTHEA Task must be removed");
+    }
+
+    @Test
+    @DisplayName("E24 – ASEM InterruptTask created → AMALTHEA ISR exists")
+    void e24_asemInterruptTaskCreated_isrCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -302,8 +290,24 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R2 (reverse) – ASEM InitTask created → AMALTHEA Task exists")
-    void r2_asemInitTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E25 – ASEM InterruptTask deleted → AMALTHEA ISR removed")
+    void e25_asemInterruptTaskDeleted_isrRemoved(@TempDir Path tempDir) throws Exception {
+        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
+        util.registerRootObjects(vsum, tempDir);
+
+        util.addAsemInterruptTask(vsum, tempDir, "reverseISRToDelete");
+        assertNotNull(util.getCorrespondingInAmalthea(vsum, "reverseISRToDelete", ISR.class));
+
+        util.deleteFromAsem(vsum, "reverseISRToDelete",
+                edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask.class);
+
+        assertNull(util.getCorrespondingInAmalthea(vsum, "reverseISRToDelete", ISR.class),
+                "AMALTHEA ISR must be removed");
+    }
+
+    @Test
+    @DisplayName("E22 – ASEM InitTask created → AMALTHEA Task exists")
+    void e22_asemInitTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -316,8 +320,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R2 (reverse) – ASEM SoftwareTask created → AMALTHEA Task exists")
-    void r2_asemSoftwareTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E22 – ASEM SoftwareTask created → AMALTHEA Task exists")
+    void e22_asemSoftwareTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -330,8 +334,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R2 (reverse) – ASEM PeriodicTask created → AMALTHEA Task exists")
-    void r2_asemPeriodicTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E22 – ASEM PeriodicTask created → AMALTHEA Task exists")
+    void e22_asemPeriodicTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -344,52 +348,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("PeriodicTask fields (reverse) – period/delay changed in ASEM → PeriodicStimulus updated in AMALTHEA")
-    void periodicTaskFields_periodDelayChanged_stimulusUpdated(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addAsemPeriodicTask(vsum, tempDir, "reversePeriodicTask");
-        util.addPeriodicStimulus(vsum, "reversePeriodicTask", 10, 5);
-
-        util.setPeriodicTaskPeriod(vsum, "reversePeriodicTask", 250);
-        util.setPeriodicTaskDelay(vsum, "reversePeriodicTask", 100);
-
-        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
-                vsum, "reversePeriodicTask", org.eclipse.app4mc.amalthea.model.Task.class);
-        assertNotNull(task);
-        PeriodicStimulus stimulus = (PeriodicStimulus) task.getStimuli().stream()
-                .filter(s -> s instanceof PeriodicStimulus).findFirst().orElse(null);
-        assertNotNull(stimulus, "PeriodicStimulus must still be attached");
-        assertEquals(250, stimulus.getRecurrence().getValue().intValue());
-        assertEquals(TimeUnit.MS, stimulus.getRecurrence().getUnit());
-        assertEquals(100, stimulus.getOffset().getValue().intValue());
-        assertEquals(TimeUnit.MS, stimulus.getOffset().getUnit());
-    }
-
-    @Test
-    @DisplayName("PeriodicTask fields (reverse) – period/delay set before any AMALTHEA stimulus exists → no stimulus auto-created")
-    void periodicTaskFields_periodSetBeforeStimulusExists_noAutoCreate(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addAsemPeriodicTask(vsum, tempDir, "earlyPeriodicTask");
-
-        assertDoesNotThrow(() -> {
-            util.setPeriodicTaskPeriod(vsum, "earlyPeriodicTask", 250);
-            util.setPeriodicTaskDelay(vsum, "earlyPeriodicTask", 100);
-        });
-
-        org.eclipse.app4mc.amalthea.model.Task task = util.getCorrespondingInAmalthea(
-                vsum, "earlyPeriodicTask", org.eclipse.app4mc.amalthea.model.Task.class);
-        assertNotNull(task);
-        boolean hasStimulus = task.getStimuli().stream().anyMatch(s -> s instanceof PeriodicStimulus);
-        assertFalse(hasStimulus, "no PeriodicStimulus should have been auto-created");
-    }
-
-    @Test
-    @DisplayName("R2 (reverse) – ASEM TimeTableTask created → AMALTHEA Task exists")
-    void r2_asemTimeTableTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E22 – ASEM TimeTableTask created → AMALTHEA Task exists")
+    void e22_asemTimeTableTaskCreated_taskCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -401,11 +361,11 @@ public class AsemToAmaltheaTest {
         assertEquals("reverseTimeTableTask", task.getName());
     }
 
-    // R5 / R6 (reverse) — Input/Output/SystemConstant → Label
+    // E26-E28 — Input/Output/SystemConstant → Label
 
     @Test
-    @DisplayName("R6 (reverse) – Input created → non-constant Label")
-    void r6_inputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E26 – Input created → non-constant Label")
+    void e26_inputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -418,8 +378,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R6 (reverse) – Output created → non-constant Label")
-    void r6_outputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E27 – Output created → non-constant Label")
+    void e27_outputCreated_nonConstantLabelCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -432,8 +392,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R5 (reverse) – SystemConstant created → constant Label")
-    void r5_systemConstantCreated_constantLabelCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E28 – SystemConstant created → constant Label")
+    void e28_systemConstantCreated_constantLabelCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -445,11 +405,11 @@ public class AsemToAmaltheaTest {
         assertTrue(label.isConstant(), "Label.constant must be true");
     }
 
-    // R7-R10 (reverse) — PrimitiveType/ComposedType → BaseTypeDefinition/Array
+    // E29-E32 — PrimitiveType/ComposedType → BaseTypeDefinition/Array
 
     @Test
-    @DisplayName("R7 (reverse) – ASEM BooleanType created → BaseTypeDefinition size=1 bit")
-    void r7_asemBooleanTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E29 – ASEM BooleanType created → BaseTypeDefinition size=1 bit")
+    void e29_asemBooleanTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -461,8 +421,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R8 (reverse) – ASEM UnsignedDiscreteType created → BaseTypeDefinition size=32 bit")
-    void r8_asemUnsignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E30 – ASEM UnsignedDiscreteType created → BaseTypeDefinition size=32 bit")
+    void e30_asemUnsignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -474,8 +434,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R8 (reverse, interactive) – user picks 8 → BaseTypeDefinition size=8 bit")
-    void r8_asemUnsignedDiscreteTypeCreated_userPicks8_size8(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E30 – user picks 8 → BaseTypeDefinition size=8 bit")
+    void e30_asemUnsignedDiscreteTypeCreated_userPicks8_size8(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -488,8 +448,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R8 (reverse) – ASEM SignedDiscreteType created → BaseTypeDefinition size=32 bit")
-    void r8_asemSignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E30 – ASEM SignedDiscreteType created → BaseTypeDefinition size=32 bit")
+    void e30_asemSignedDiscreteTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -501,8 +461,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R8 (reverse, interactive) – user picks 16 → BaseTypeDefinition size=16 bit")
-    void r8_asemSignedDiscreteTypeCreated_userPicks16_size16(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E30 – user picks 16 → BaseTypeDefinition size=16 bit")
+    void e30_asemSignedDiscreteTypeCreated_userPicks16_size16(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -515,8 +475,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R9 (reverse) – ASEM ContinuousType created → BaseTypeDefinition size=64 bit")
-    void r9_asemContinuousTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E31 – ASEM ContinuousType created → BaseTypeDefinition size=64 bit")
+    void e31_asemContinuousTypeCreated_baseTypeDefinitionCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -528,8 +488,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R9 (reverse, interactive) – user picks 32 → BaseTypeDefinition size=32 bit")
-    void r9_asemContinuousTypeCreated_userPicks32_size32(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E31 – user picks 32 → BaseTypeDefinition size=32 bit")
+    void e31_asemContinuousTypeCreated_userPicks32_size32(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -542,8 +502,8 @@ public class AsemToAmaltheaTest {
     }
 
     @Test
-    @DisplayName("R10 (reverse) – ASEM ComposedType created → Array exists")
-    void r10_asemComposedTypeCreated_arrayCreated(@TempDir Path tempDir) throws Exception {
+    @DisplayName("E32 – ASEM ComposedType created → Array exists")
+    void e32_asemComposedTypeCreated_arrayCreated(@TempDir Path tempDir) throws Exception {
         InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
         util.registerRootObjects(vsum, tempDir);
 
@@ -551,32 +511,5 @@ public class AsemToAmaltheaTest {
 
         Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
         assertNotNull(array, "Array must be created for the ASEM ComposedType");
-    }
-
-    @Test
-    @DisplayName("P12 (reverse) – ComposedType.numberElements copied to Array at creation")
-    void p12_asemComposedTypeCreated_numberElementsCopied(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addAsemComposedType(vsum, tempDir, "reverseComposed", 15);
-
-        Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
-        assertNotNull(array, "Array must be created for the ASEM ComposedType");
-        assertEquals(15, array.getNumberElements());
-    }
-
-    @Test
-    @DisplayName("P12 (reverse) – ComposedType.numberElements changed → Array.numberElements updated")
-    void p12_asemComposedTypeNumberElementsChanged_arrayUpdated(@TempDir Path tempDir) throws Exception {
-        InternalVirtualModel vsum = util.createDefaultVirtualModel(tempDir);
-        util.registerRootObjects(vsum, tempDir);
-
-        util.addAsemComposedType(vsum, tempDir, "reverseComposed", 15);
-        util.setComposedTypeNumberElements(vsum, "reverseComposed", 40);
-
-        Array array = util.getCorrespondingInAmalthea(vsum, null, Array.class);
-        assertNotNull(array);
-        assertEquals(40, array.getNumberElements());
     }
 }

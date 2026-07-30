@@ -218,6 +218,7 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | `name` | `EString` (inherited) | 0..1 | Inherited from `Named`. |
 | `id` | `EString` (inherited) | 1..1 | Inherited from `Identifiable`. |
 | `type` | `classifiers::Classifier` | 0..1 | Reference to the type classifier of this element. |
+| `constant` | `EBoolean` | 0..1 | Mirrors `Label.constant` for whichever concrete subclass (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) this element currently is — kept correct by every AMALTHEA-origin creation/swap routine, and used as the ASEM-origin trigger for P8/P9 (flipping it swaps the object and updates `Label.constant`). Not a second source of truth — always reflects the object's actual class. |
 
 ### 2.4 Package: classifiers
 
@@ -452,7 +453,7 @@ Context Task
 
 **Footnote \*\*\*\* — called runnables:** all `Runnable` instances reachable via the Task's `activityGraph.items` of type `RunnableCall`, including ones nested inside `Switch`/`ProbabilitySwitch` entries rather than sitting directly on the `activityGraph`. These become entries in `Task.processes[]`.
 
-> This flags this exact case as a real limitation of MIR — a `RunnableCall` reachable only through nested `CallSequence`/`LabelSwitch`/`ProbabilitySwitch` structures can't be declared in plain MIR without a custom `"..."` . The project doesn't inherit this limitation: `RunnableCallCreated` reacts to the `RunnableCall`'s type directly (not a declared traversal path), and AMALTHEA's own `ActivityGraphItem.getContainingExecutable()` is a derived reference that walks up through arbitrary nesting on its own — confirmed with a test where the call is buried inside a `ProbabilitySwitch` entry (`AmaltheaToAsemTest#r2_runnableCall_nestedInProbabilitySwitch_populatesProcesses`), passing consistently across repeated runs.
+> This flags this exact case as a real limitation of MIR — a `RunnableCall` reachable only through nested `CallSequence`/`LabelSwitch`/`ProbabilitySwitch` structures can't be declared in plain MIR without a custom `"..."` . The project doesn't inherit this limitation: `RunnableCallCreated` reacts to the `RunnableCall`'s type directly (not a declared traversal path), and AMALTHEA's own `ActivityGraphItem.getContainingExecutable()` is a derived reference that walks up through arbitrary nesting on its own — confirmed with a test where the call is buried inside a `ProbabilitySwitch` entry (`AmaltheaToAsemStructuralTest#runnableCall_nestedInProbabilitySwitch_populatesProcesses`), passing consistently across repeated runs.
 
 > [!NOTE]
 > Priority storage in AMALTHEA 3.3 is indirect — it lives as a `SchedulingParameter` on `TaskAllocation`, not a direct attribute of `Task`. Navigation: `MappingModel → taskAllocation → schedulingParameters`. Implemented as a second, tagged Vitruv correspondence (`Task ↔ SchedulingParameter`, tag `"taskPriority"`) rather than copying the value into a new ASEM field — the value is read live from AMALTHEA via the tag when needed.
@@ -460,7 +461,7 @@ Context Task
 > AMALTHEA's `Task` has four possible ASEM subtypes (`InitTask`/`SoftwareTask`/`PeriodicTask`/`TimeTableTask`) and nothing on `Task` (`preemption`, `multipleTaskActivationLimit`, `stimuli`) reliably signals which one applies — this is the same "mapping one element to many elements" ambiguity . Rather than guess or default to one fixed subtype, the choice is asked for interactively: `TaskCreated`'s routine opens a single-selection dialog (via Vitruv's `UserInteractor`, the same mechanism the pcmjava case study uses for its own component-kind selection in `Java2PcmClassifier.reactions`) listing the four subtypes, and creates whichever one is chosen. In interactive use this is a real prompt to the person driving the change; in automated tests it's answered by a scripted `TestUserInteraction` response (`VSUMRunner.addTask(..., subtypeChoice)`), defaulting to `"SoftwareTask"` when a test doesn't care which subtype it gets. `InterruptTask` (Rule 3) stays unconditional — `ISR` is already a distinct AMALTHEA class, so no selection is needed there.
 
 > [!NOTE]
-> **PeriodicTask.period/delay** : synced from AMALTHEA's `PeriodicStimulus.recurrence`/`.offset` the moment a `PeriodicStimulus` is attached to a Task's `stimuli` list, via the DSL's `element X inserted in Type[feature]` trigger (`Process.stimuli` is a plain, non-containment reference — `Stimulus` objects actually live under `StimuliModel` — so this doesn't need `eContainer` navigation the way P11 would). Values are normalized to whole milliseconds regardless of which AMALTHEA `TimeUnit` was used. Reverse direction (ASEM `PeriodicTask.period`/`.delay` changed → AMALTHEA `PeriodicStimulus.recurrence`/`.offset` updated) is a plain two-attribute property sync, always writing back in milliseconds. **Scope limit:** only the moment of attaching a `PeriodicStimulus` is handled on the AMALTHEA→ASEM side — editing `recurrence.value`/`offset.value` on an *already-attached* stimulus afterward is not detected (same class of problem as P11: a nested `Time` object with no way back to its owning Task without `eContainer`). The reverse direction also doesn't auto-create a `PeriodicStimulus` if a `PeriodicTask`'s period/delay is set before any stimulus exists on the AMALTHEA side — same "no auto-create" scope choice as `Argument`.
+> **PeriodicTask.period/delay** — fully bidirectional, both the moment-of-attachment case and the later-edit case. AMALTHEA→ASEM: synced from `PeriodicStimulus.recurrence`/`.offset` the moment a `PeriodicStimulus` is attached to a Task's `stimuli` list (S10, via the DSL's `element X inserted in Type[feature]` trigger — `Process.stimuli` is a plain, non-containment reference, so this doesn't need `eContainer`), **and** re-synced whenever `recurrence.value`/`offset.value` is edited on an *already-attached* stimulus afterward (P18/P19 AMALTHEA-origin), using the same tagged-correspondence + idempotency trick P11 uses (`"periodicStimulusOwner"` tag on the `Time` objects, linking back to the owning `Task` without `eContainer`). ASEM→AMALTHEA (P18/P19): `PeriodicTask.period`/`.delay` changed → `PeriodicStimulus.recurrence`/`.offset` updated if a stimulus already exists, or a new `PeriodicStimulus` is auto-created and attached (S10 reverse) if none exists yet — closing what was previously a "no auto-create" scope limit. Values are always normalized to/from whole milliseconds.
 
 #### Rule 3 — ISR ↔ InterruptTask
 
@@ -504,6 +505,8 @@ Context amalthea::Label
 > ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does. Treated as a documentation error rather than something to implement against; removed from this rule's target list.
 >
 > `SystemConstant` is implemented as a real, separate ASEM class (confirmed with the supervisor, no longer a "may be" guess). The discriminator: a constant=true `Label` carrying a `Tag` whose `name` or `tagType` is `"systemConstant"` (AMALTHEA's existing generic `ITaggable` mechanism) becomes a `SystemConstant`; otherwise it stays a plain `Constant`. This convention was chosen because no AMALTHEA field cleanly signals "system" vs. "plain" constant on its own, and the thesis figure (Table 5.1's original source) that might define the intended rule wasn't available.
+>
+> **P8/P9 are now bidirectional.** A new `constant: EBoolean` attribute on ASEM's `base::TypedElement` (the common supertype of `Variable` and `Constant`) mirrors `Label.constant` — it exists purely as a flip trigger, not a second source of truth: whichever concrete class (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) an object currently is, it also carries this flag set to the correct value for that class, kept in sync by every creation and swap routine on the AMALTHEA→ASEM side. Flipping it directly on an ASEM object (`AsemToAmalthea.reactions`, `MessageConstantFlagChanged`/`ConstantConstantFlagChanged`/etc.) updates the corresponding `Label.constant` and lets the *existing* `LabelFlippedToConstant`/`LabelFlippedToVariable` swap routines do the actual object replacement — no duplicated swap logic.
 
 #### Rule 6 — Label (constant=false) ↔ Variable / Message / Argument / Input / Output
 
@@ -670,6 +673,7 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | E31 | ASEM `ContinuousType` created | create AMALTHEA `BaseTypeDefinition`, size asked interactively — reverse of Rule 9 |
 | E32 | ASEM `ComposedType` created | create AMALTHEA `Array` — reverse of Rule 10 |
 | E33 🆕 | AMALTHEA `SWModel` created | create ASEM `PrimitiveTypeRepository`, named `"PrimitiveTypes"` — not part of R1–R10, see §2.4 |
+| E34 🆕 | ASEM `Message`/`Constant`/`Input`/`Output`/`SystemConstant` deleted | delete the corresponding AMALTHEA `Label` — reverse of E11 |
 
 #### Property Rules — attribute value changes
 
@@ -682,8 +686,8 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | P5 | `Label.name` changed | set the corresponding `Message`/`Constant`/`Input`/`Output`/`SystemConstant`'s `.name` = new name |
 | P6 | `Message.name` changed | set `Label.name` = new name |
 | P7 | `Constant.name` changed | set `Label.name` = new name |
-| P8 | `Label.constant` changed false → true | replace ASEM `Message`/`Input`/`Output` with `Constant` or `SystemConstant`; update correspondence |
-| P9 | `Label.constant` changed true → false | replace ASEM `Constant`/`SystemConstant` with `Message`/`Input`/`Output`; update correspondence |
+| P8 | `Label.constant` changed false → true | replace ASEM `Message`/`Input`/`Output` with `Constant` or `SystemConstant`; update correspondence — **implemented, both directions**: a new ASEM `TypedElement.constant` flag mirrors this, and flipping it on the ASEM side flips `Label.constant` and triggers the same swap logic (see NOTE below) |
+| P9 | `Label.constant` changed true → false | replace ASEM `Constant`/`SystemConstant` with `Message`/`Input`/`Output`; update correspondence — **implemented, both directions**, see P8 |
 | P10 | `Label.dataType` changed | update `Message.type` / `Constant.type` to corresponding ASEM `PrimitiveType` |
 | P11 🆕 | `BaseTypeDefinition.size` changed | replace ASEM `PrimitiveType` with type matching new size (re-apply Rules 7–9) — **implemented**, see NOTE on P11 above and in `AmaltheaToAsem.reactions` |
 | P12 🆕 | `Array.numberElements` changed | update `ComposedType.numberElements`, and vice versa — **implemented**, both directions |
@@ -692,8 +696,8 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | P15 | ASEM Task subtype `.name` changed | set AMALTHEA `Task.name` = new name |
 | P16 | ASEM `InterruptTask.name` changed | set AMALTHEA `ISR.name` = new name |
 | P17 | ASEM `Input`/`Output`/`SystemConstant` `.name` changed | set corresponding `Label.name` = new name |
-| P18 🆕 | `PeriodicTask.period` changed | update `PeriodicStimulus.recurrence` (milliseconds) — see NOTE on Rule 2 above |
-| P19 🆕 | `PeriodicTask.delay` changed | update `PeriodicStimulus.offset` (milliseconds) |
+| P18 🆕 | `PeriodicTask.period` changed | update `PeriodicStimulus.recurrence` (milliseconds), auto-creating the `PeriodicStimulus` if none exists yet — **implemented, both directions**, see NOTE on Rule 2 above |
+| P19 🆕 | `PeriodicTask.delay` changed | update `PeriodicStimulus.offset` (milliseconds), auto-creating the `PeriodicStimulus` if none exists yet — **implemented, both directions**, see NOTE on Rule 2 above |
 
 #### Structural Rules — containment and reference changes
 
@@ -708,7 +712,7 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | S7 | `Message` added to `Module.typedElements` | add corresponding AMALTHEA `Label` (constant=false) to `Component.labels` |
 | S8 | `Constant` added to `Module.typedElements` | add corresponding AMALTHEA `Label` (constant=true) to `Component.labels` |
 | S9 | `LabelAccess` inserted into `Label.labelAccesses` | retroactively swap ASEM `Message` ↔ `Input`/`Output` once the read/write pattern becomes known — see Rule 6 |
-| S10 🆕 | `PeriodicStimulus` inserted into `Task.stimuli` | sync `PeriodicTask.period`/`delay` from `recurrence`/`offset` — see NOTE on Rule 2 above |
+| S10 🆕 | `PeriodicStimulus` inserted into `Task.stimuli` | sync `PeriodicTask.period`/`delay` from `recurrence`/`offset`. AMALTHEA-origin only by design — `PeriodicTask` has no ASEM-side nested object to mirror `PeriodicStimulus` insertion, so there's no possible reverse trigger for this specific rule; the ASEM-origin side of the period/delay story is P18/P19 instead, see NOTE on Rule 2 above |
 
 #### Completeness Rules — model-wide invariants
 
@@ -754,3 +758,32 @@ mvn clean verify -pl <module-name> -am
 
 > [!TIP]
 > If the build fails on a fresh clone with an MWE2 URI resolver error, make sure the `.genmodel`/`.ecore` files have been generated first (`mvn clean install` on the metamodel module before running `verify` on the full reactor).
+
+### 4.1 Running Interactively (Real User Input)
+
+`mvn clean verify` runs the automated test suite, which answers every interactive dialog (Task subtype, primitive-type bit size) with a pre-scripted value — no human is ever prompted. To actually be prompted and answer for real, run `VSUMExample`'s `main()` method directly.
+
+`vsum/sample-data/` is not committed (it's generated, machine-specific data — see the note below), so the first time you do this, build it locally:
+
+```bash
+mvn -pl vsum org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass="tools.vitruv.methodologisttemplate.vsum.VSUMSampleDataGenerator" -Dexec.classpathScope=compile
+```
+
+Then run the interactive demo itself:
+
+```bash
+mvn -pl vsum org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass="tools.vitruv.methodologisttemplate.vsum.VSUMExample" -Dexec.classpathScope=compile
+```
+
+Run both from the project root, and from a real terminal — `System.console()` is required, so use a genuine Terminal/shell window.
+
+`VSUMExample` loads the baseline model built by the step above, then asks 4 real questions in sequence, each one waiting for typed input:
+1. Task subtype — E18
+2. UnsignedDiscreteType bit size — E30
+3. SignedDiscreteType bit size — E30
+4. ContinuousType bit size — E31
+
+Re-running `VSUMExample` repeatedly against the same `vsum/sample-data/` folder adds another same-named `Task`/type each time, since the object names in the demo are hardcoded. Re-running `VSUMSampleDataGenerator` against an already-populated folder will similarly conflict — only run it once, right after generating a fresh copy is needed.
+
+> [!NOTE]
+> `vsum/sample-data/` is excluded from git (see `.gitignore`) because Vitruv bakes the *absolute filesystem path* of the storage folder into its internal bookkeeping (`vsum/models.models`, `vsum/uuid.uuid`) — a copy generated on one machine will not load correctly on another. `VSUMSampleDataGenerator` is the portable, committed "recipe"; run it locally to get a working copy tied to your own checkout.

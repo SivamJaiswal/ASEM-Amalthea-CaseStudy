@@ -38,6 +38,7 @@ import org.eclipse.app4mc.amalthea.model.TimeUnit;
 
 import edu.kit.ipd.sdq.metamodels.asem.AsemFactory;
 import edu.kit.ipd.sdq.metamodels.asem.Dummy;
+import edu.kit.ipd.sdq.metamodels.asem.base.TypedElement;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.Classifier;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.InterruptTask;
 import edu.kit.ipd.sdq.metamodels.asem.classifiers.InitTask;
@@ -104,10 +105,7 @@ public class VSUMRunner {
         return model;
     }
 
-    /**
-     * Registers one Amalthea root and one ASEM Dummy root.
-     * Must be called once per test immediately after createDefaultVirtualModel.
-     */
+    /** Registers one Amalthea root and one ASEM Dummy root. */
     public void registerRootObjects(VirtualModel vsum, Path filePath) {
         // Register Amalthea root
         CommittableView aView = getDefaultView(vsum, List.of(Amalthea.class))
@@ -150,11 +148,7 @@ public class VSUMRunner {
         return getDefaultView(vsum, List.of(Amalthea.class));
     }
 
-    /**
-     * Returns a view containing all ASEM roots: the Dummy root plus every standalone
-     * Classifier root (Module, ComposedType, BooleanType, Unsigned/SignedDiscreteType,
-     * ContinuousType, ...) persisted independently by AmaltheaToAsem.reactions.
-     */
+    /** Returns a view containing all ASEM roots: the Dummy root plus every standalone Classifier root. */
     public View getAsemView(VirtualModel vsum) {
         return getDefaultView(vsum, List.of(Dummy.class, Classifier.class));
     }
@@ -169,11 +163,7 @@ public class VSUMRunner {
         return null;
     }
 
-    /**
-     * PrimitiveTypeRepository extends Named, not Classifier, so it doesn't show up in
-     * getAsemView's selectable set — needs its own view, same reason getCorrespondingInAmalthea
-     * has a fallback search for other independently-persisted roots.
-     */
+    /** Returns the PrimitiveTypeRepository root. */
     public PrimitiveTypeRepository getPrimitiveTypeRepository(VirtualModel vsum) {
         var repos = getDefaultView(vsum, List.of(PrimitiveTypeRepository.class))
                 .getRootObjects(PrimitiveTypeRepository.class);
@@ -234,6 +224,7 @@ public class VSUMRunner {
 
     //AMALTHEA helpers
 
+    /** Creates a Component under the Amalthea root (E1). */
     public String addComponent(VirtualModel vsum, String name) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -244,6 +235,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Creates a Runnable under a Component (E5). */
     public String addRunnable(VirtualModel vsum, String componentName,
                                String runnableName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -258,6 +250,7 @@ public class VSUMRunner {
         return runnableName;
     }
 
+    /** Creates a Label under a Component (E9, E10). */
     public String addLabel(VirtualModel vsum, String componentName,
                             String labelName, boolean constant) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -273,6 +266,7 @@ public class VSUMRunner {
         return labelName;
     }
 
+    /** Creates a BaseTypeDefinition (E14, E15, E16). */
     public String addBaseTypeDefinition(VirtualModel vsum, String name,
                                          int sizeBits, String alias) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -305,6 +299,7 @@ public class VSUMRunner {
         });
     }
 
+    /** Creates an Array-based DataTypeDefinition (E17). */
     public String addArrayTypeDefinition(VirtualModel vsum, String name,
                                           int elements) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
@@ -329,20 +324,12 @@ public class VSUMRunner {
         });
     }
 
-    /**
-     * Creates a Task. Task creation asks (via userInteraction) which ASEM Task
-     * subtype to use — defaults to "SoftwareTask" so existing callers don't need
-     * to script a response themselves.
-     */
+    /** Creates a Task (E18), defaulting the subtype dialog answer to "SoftwareTask". */
     public String addTask(VirtualModel vsum, String componentName, String taskName) {
         return addTask(vsum, componentName, taskName, "SoftwareTask");
     }
 
-    /**
-     * Creates a Task, scripting {@code subtypeChoice} ("InitTask" / "SoftwareTask" /
-     * "PeriodicTask" / "TimeTableTask") as the answer to the resulting Task-subtype
-     * selection dialog.
-     */
+    /** Creates a Task (E18), scripting {@code subtypeChoice} as the Task-subtype dialog answer. */
     public String addTask(VirtualModel vsum, String componentName, String taskName,
                            String subtypeChoice) {
         userInteraction.onNextMultipleChoiceSingleSelection().respondWith(subtypeChoice);
@@ -359,13 +346,13 @@ public class VSUMRunner {
         return taskName;
     }
 
-    /** Attaches a PeriodicStimulus (recurrence/offset in milliseconds) to an existing Task. */
+    /** Attaches a PeriodicStimulus (recurrence/offset in milliseconds) to an existing Task (S10). */
     public void addPeriodicStimulus(VirtualModel vsum, String taskName,
                                      int recurrenceMs, int offsetMs) {
         addPeriodicStimulus(vsum, taskName, recurrenceMs, TimeUnit.MS, offsetMs, TimeUnit.MS);
     }
 
-    /** Attaches a PeriodicStimulus with an explicit unit for recurrence and offset. */
+    /** Attaches a PeriodicStimulus with an explicit unit for recurrence and offset (S10). */
     public void addPeriodicStimulus(VirtualModel vsum, String taskName,
                                      int recurrenceValue, TimeUnit recurrenceUnit,
                                      int offsetValue, TimeUnit offsetUnit) {
@@ -396,7 +383,7 @@ public class VSUMRunner {
         });
     }
 
-    /** Changes an existing PeriodicTask's period (ms) in ASEM (P-rule reverse-sync test). */
+    /** Changes an existing PeriodicTask's period (ms) in ASEM (P18). */
     public void setPeriodicTaskPeriod(VirtualModel vsum, String taskName, int periodMs) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -410,7 +397,7 @@ public class VSUMRunner {
         });
     }
 
-    /** Changes an existing PeriodicTask's delay (ms) in ASEM (P-rule reverse-sync test). */
+    /** Changes an existing PeriodicTask's delay (ms) in ASEM (P19). */
     public void setPeriodicTaskDelay(VirtualModel vsum, String taskName, int delayMs) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -424,6 +411,7 @@ public class VSUMRunner {
         });
     }
 
+    /** Creates an ISR under a Component (E20). */
     public String addISR(VirtualModel vsum, String componentName, String isrName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -438,7 +426,7 @@ public class VSUMRunner {
         return isrName;
     }
 
-    /** Adds a RunnableCall to a Task's or ISR's activityGraph, calling the given Runnable. */
+    /** Adds a RunnableCall to a Task's or ISR's activityGraph, calling the given Runnable (Rule 2 note). */
     public void addRunnableCall(VirtualModel vsum, String callerName, String calleeRunnableName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -459,13 +447,7 @@ public class VSUMRunner {
         });
     }
 
-    /**
-     * Adds a RunnableCall buried two levels deep inside a ProbabilitySwitch
-     * (Task/ISR.activityGraph -> ProbabilitySwitch -> ProbabilitySwitchEntry -> RunnableCall),
-     * instead of directly on the Task/ISR's activityGraph. Used to verify whether
-     * AMALTHEA's derived ActivityGraphItem.containingExecutable resolves correctly
-     * through nested call structures, not just flat ones.
-     */
+    /** Adds a RunnableCall nested inside a ProbabilitySwitch (Rule 2 note). */
     public void addNestedRunnableCall(VirtualModel vsum, String callerName, String calleeRunnableName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -492,7 +474,7 @@ public class VSUMRunner {
         });
     }
 
-    /** Adds a LabelAccess (read or write) from a Runnable to a Label. */
+    /** Adds a LabelAccess (read or write) from a Runnable to a Label (S9). */
     public void addLabelAccess(VirtualModel vsum, String runnableName, String labelName, boolean isRead) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -510,12 +492,7 @@ public class VSUMRunner {
         });
     }
 
-    /**
-     * Creates a constant=true Label already tagged "systemConstant" in a single transaction.
-     * The tag must be present BEFORE the Label is first tracked, since the SystemConstant
-     * discriminator reacts on Label creation, not on a later Tag addition — creating first
-     * and tagging afterward (as two separate commits) would create a plain Constant first.
-     */
+    /** Creates a constant=true Label already tagged "systemConstant" in a single transaction (E10). */
     public String addSystemConstantTaggedLabel(VirtualModel vsum, String componentName, String labelName) {
         CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -567,12 +544,8 @@ public class VSUMRunner {
 
     //ASEM helpers — all navigate through Dummy root
 
-    /**
-     * Adds a Module as a child of the Dummy root.
-     * All subsequent ASEM operations find this Module via getAsemView → Dummy.
-     */
+    /** Adds a Module as a child of the Dummy root (E3). */
     public String addModule(VirtualModel vsum, Path filePath, String name) {
-        // Register Module as its own root — ASEM has no container class
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
         modifyView(view, v -> {
@@ -584,6 +557,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Creates a void, no-param Method under a Module (E7). */
     public String addVoidMethod(VirtualModel vsum, String moduleName,
                                  String methodName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
@@ -597,6 +571,7 @@ public class VSUMRunner {
         return methodName;
     }
 
+    /** Creates a Method with a returnType, so E7's OCL guard does not fire. */
     public String addVoidMethodWithReturnType(VirtualModel vsum,
                                                String moduleName, String methodName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
@@ -611,40 +586,46 @@ public class VSUMRunner {
         return methodName;
     }
 
+    /** Creates an Input under a Module (E26). */
     public String addInput(VirtualModel vsum, String moduleName, String inputName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             Module module = findModuleInView(v, moduleName);
             Input input = DataexchangeFactoryImpl.eINSTANCE.createInput();
             input.setName(inputName);
+            input.setConstant(false);
             module.getTypedElements().add(input);
         });
         return inputName;
     }
 
+    /** Creates an Output under a Module (E27). */
     public String addOutput(VirtualModel vsum, String moduleName, String outputName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             Module module = findModuleInView(v, moduleName);
             Output output = DataexchangeFactoryImpl.eINSTANCE.createOutput();
             output.setName(outputName);
+            output.setConstant(false);
             module.getTypedElements().add(output);
         });
         return outputName;
     }
 
+    /** Creates a SystemConstant under a Module (E28). */
     public String addSystemConstant(VirtualModel vsum, String moduleName, String constantName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
         modifyView(view, v -> {
             Module module = findModuleInView(v, moduleName);
             SystemConstant sc = DataexchangeFactoryImpl.eINSTANCE.createSystemConstant();
             sc.setName(constantName);
+            sc.setConstant(true);
             module.getTypedElements().add(sc);
         });
         return constantName;
     }
 
-    /** Registers an ASEM Task as its own root — mirrors addModule, since ASEM has no container class. */
+    /** Registers an ASEM Task as its own root (E22). */
     public String addAsemTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -657,6 +638,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM InterruptTask as its own root (E24). */
     public String addAsemInterruptTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -669,6 +651,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM InitTask as its own root (E22). */
     public String addAsemInitTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -681,6 +664,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM SoftwareTask as its own root (E22). */
     public String addAsemSoftwareTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -693,6 +677,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM PeriodicTask as its own root (E22). */
     public String addAsemPeriodicTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -705,6 +690,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM TimeTableTask as its own root (E22). */
     public String addAsemTimeTableTask(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -717,6 +703,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM BooleanType as its own root (E29). */
     public String addAsemBooleanType(VirtualModel vsum, Path filePath, String name) {
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
                 .withChangeRecordingTrait();
@@ -729,12 +716,12 @@ public class VSUMRunner {
         return name;
     }
 
-    /** Creates an UnsignedDiscreteType. Answers the resulting size dialog with "32" (current default). */
+    /** Creates an UnsignedDiscreteType (E30). Answers the resulting size dialog with "32" (current default). */
     public String addAsemUnsignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
         return addAsemUnsignedDiscreteType(vsum, filePath, name, "32");
     }
 
-    /** Creates an UnsignedDiscreteType, scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
+    /** Creates an UnsignedDiscreteType (E30), scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
     public String addAsemUnsignedDiscreteType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
         userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
@@ -748,12 +735,12 @@ public class VSUMRunner {
         return name;
     }
 
-    /** Creates a SignedDiscreteType. Answers the resulting size dialog with "32" (current default). */
+    /** Creates a SignedDiscreteType (E30). Answers the resulting size dialog with "32" (current default). */
     public String addAsemSignedDiscreteType(VirtualModel vsum, Path filePath, String name) {
         return addAsemSignedDiscreteType(vsum, filePath, name, "32");
     }
 
-    /** Creates a SignedDiscreteType, scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
+    /** Creates a SignedDiscreteType (E30), scripting {@code sizeChoice} ("8"/"16"/"32") as the dialog answer. */
     public String addAsemSignedDiscreteType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
         userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
@@ -767,12 +754,12 @@ public class VSUMRunner {
         return name;
     }
 
-    /** Creates a ContinuousType. Answers the resulting size dialog with "64" (current default). */
+    /** Creates a ContinuousType (E31). Answers the resulting size dialog with "64" (current default). */
     public String addAsemContinuousType(VirtualModel vsum, Path filePath, String name) {
         return addAsemContinuousType(vsum, filePath, name, "64");
     }
 
-    /** Creates a ContinuousType, scripting {@code sizeChoice} ("32"/"64") as the dialog answer. */
+    /** Creates a ContinuousType (E31), scripting {@code sizeChoice} ("32"/"64") as the dialog answer. */
     public String addAsemContinuousType(VirtualModel vsum, Path filePath, String name, String sizeChoice) {
         userInteraction.onNextMultipleChoiceSingleSelection().respondWith(sizeChoice);
         CommittableView view = getDefaultView(vsum, List.of(Dummy.class))
@@ -786,6 +773,7 @@ public class VSUMRunner {
         return name;
     }
 
+    /** Registers an ASEM ComposedType as its own root (E32). */
     public String addAsemComposedType(VirtualModel vsum, Path filePath, String name) {
         return addAsemComposedType(vsum, filePath, name, 0);
     }
@@ -820,6 +808,7 @@ public class VSUMRunner {
         });
     }
 
+    /** Creates a Message under a Module (E12). */
     public String addMessage(VirtualModel vsum, String moduleName,
                               String messageName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
@@ -827,11 +816,13 @@ public class VSUMRunner {
             Module module = findModuleInView(v, moduleName);
             Message msg = DataexchangeFactoryImpl.eINSTANCE.createMessage();
             msg.setName(messageName);
+            msg.setConstant(false);
             module.getTypedElements().add(msg);
         });
         return messageName;
     }
 
+    /** Creates a Constant under a Module (E13). */
     public String addConstant(VirtualModel vsum, String moduleName,
                                String constantName) {
         CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
@@ -839,6 +830,7 @@ public class VSUMRunner {
             Module module = findModuleInView(v, moduleName);
             Constant c = DataexchangeFactoryImpl.eINSTANCE.createConstant();
             c.setName(constantName);
+            c.setConstant(true);
             module.getTypedElements().add(c);
         });
         return constantName;
@@ -860,6 +852,45 @@ public class VSUMRunner {
             EObject el = findInAsemView(v, type, name);
             if (el != null)
                 EcoreUtil.remove(el);
+        });
+    }
+
+    /** Sets TypedElement.constant on an ASEM Message/Constant/Input/Output/SystemConstant (P8, P9). */
+    public void setConstantInAsem(VirtualModel vsum, String name,
+                                   Class<? extends TypedElement> type, boolean constant) {
+        CommittableView view = getAsemView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            TypedElement el = findInAsemView(v, type, name);
+            if (el != null)
+                el.setConstant(constant);
+        });
+    }
+
+    /** Sets an attached PeriodicStimulus's recurrence value (P18). */
+    public void setStimulusRecurrence(VirtualModel vsum, String taskName, int valueMs) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            org.eclipse.app4mc.amalthea.model.Task task = findByNameAndType(
+                    getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.Task.class, taskName);
+            PeriodicStimulus stimulus = (PeriodicStimulus) task.getStimuli().stream()
+                    .filter(s -> s instanceof PeriodicStimulus).findFirst().orElse(null);
+            if (stimulus != null) {
+                stimulus.getRecurrence().setValue(BigInteger.valueOf(valueMs));
+            }
+        });
+    }
+
+    /** Sets an attached PeriodicStimulus's offset value (P19). */
+    public void setStimulusOffset(VirtualModel vsum, String taskName, int valueMs) {
+        CommittableView view = getAmaltheaView(vsum).withChangeRecordingTrait();
+        modifyView(view, v -> {
+            org.eclipse.app4mc.amalthea.model.Task task = findByNameAndType(
+                    getAmaltheaRoot(v), org.eclipse.app4mc.amalthea.model.Task.class, taskName);
+            PeriodicStimulus stimulus = (PeriodicStimulus) task.getStimuli().stream()
+                    .filter(s -> s instanceof PeriodicStimulus).findFirst().orElse(null);
+            if (stimulus != null) {
+                stimulus.getOffset().setValue(BigInteger.valueOf(valueMs));
+            }
         });
     }
 

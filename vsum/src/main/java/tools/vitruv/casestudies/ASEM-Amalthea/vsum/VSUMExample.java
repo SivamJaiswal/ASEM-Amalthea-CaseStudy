@@ -11,55 +11,80 @@ import org.eclipse.app4mc.amalthea.model.Amalthea;
 import org.eclipse.app4mc.amalthea.model.AmaltheaFactory;
 import org.eclipse.app4mc.amalthea.model.Component;
 
+import edu.kit.ipd.sdq.metamodels.asem.primitivetypes.impl.PrimitivetypesFactoryImpl;
+
 import mir.reactions.amaltheaToAsem.AmaltheaToAsemChangePropagationSpecification;
 import mir.reactions.asemToAmalthea.AsemToAmaltheaChangePropagationSpecification;
 
+import tools.vitruv.change.interaction.CliInteractionResultProviderImpl;
 import tools.vitruv.change.propagation.ChangePropagationSpecification;
-import tools.vitruv.change.testutils.TestUserInteraction;
 import tools.vitruv.framework.views.CommittableView;
 import tools.vitruv.framework.views.View;
 import tools.vitruv.framework.views.ViewTypeFactory;
 import tools.vitruv.framework.vsum.VirtualModel;
 import tools.vitruv.framework.vsum.VirtualModelBuilder;
 
-/** This class provides an example how to define and use a VSUM. */
+/** Example how to define and use a VSUM, run interactively — requires a real terminal. */
 public class VSUMExample {
-  private static final String AMALTHEA_FILE = "/amalthea.amxmi";
 
   public static void main(String[] args) throws IOException {
-    Path storageFolder = Path.of("vsumexample");
+    Path storageFolder = Path.of("vsum/sample-data").toAbsolutePath();
     VirtualModel vsum = createDefaultVirtualModel(storageFolder);
 
-    // Register the Amalthea root; a corresponding ASEM Module is created for
-    // every Component added underneath it (see AmaltheaToAsem.reactions).
-    modifyView(
-        getDefaultView(vsum).withChangeRecordingTrait(),
-        (CommittableView v) -> {
-          Amalthea root = AmaltheaFactory.eINSTANCE.createAmalthea();
-          root.setComponentsModel(AmaltheaFactory.eINSTANCE.createComponentsModel());
-          root.setSwModel(AmaltheaFactory.eINSTANCE.createSWModel());
-          v.registerRoot(root, URI.createFileURI(storageFolder + AMALTHEA_FILE));
-        });
-
+    // E18 — adds a Task, which asks (via the CLI) which ASEM Task subtype to use.
     modifyView(
         getDefaultView(vsum).withChangeRecordingTrait(),
         (CommittableView v) -> {
           Amalthea root = v.getRootObjects(Amalthea.class).iterator().next();
-          Component component = AmaltheaFactory.eINSTANCE.createComponent();
-          component.setName("ExampleComponent");
-          root.getComponentsModel().getComponents().add(component);
+          Component component = root.getComponentsModel().getComponents().get(0);
+          org.eclipse.app4mc.amalthea.model.Task task =
+              AmaltheaFactory.eINSTANCE.createTask();
+          task.setName("ExampleTask");
+          root.getSwModel().getTasks().add(task);
+          component.getProcesses().add(task);
+        });
+
+    // E30 — creates an UnsignedDiscreteType in ASEM, which asks (via the CLI) the bit size.
+    modifyView(
+        getDefaultView(vsum).withChangeRecordingTrait(),
+        (CommittableView v) -> {
+          var type = PrimitivetypesFactoryImpl.eINSTANCE.createUnsignedDiscreteType();
+          type.setName("ExampleUnsignedType");
+          v.registerRoot(type,
+              URI.createFileURI(storageFolder + "/asem/type_ExampleUnsignedType.asem"));
+        });
+
+    // E30 — creates a SignedDiscreteType in ASEM, which asks the same bit-size question.
+    modifyView(
+        getDefaultView(vsum).withChangeRecordingTrait(),
+        (CommittableView v) -> {
+          var type = PrimitivetypesFactoryImpl.eINSTANCE.createSignedDiscreteType();
+          type.setName("ExampleSignedType");
+          v.registerRoot(type,
+              URI.createFileURI(storageFolder + "/asem/type_ExampleSignedType.asem"));
+        });
+
+    // E31 — creates a ContinuousType in ASEM, which asks (via the CLI) 32- or 64-bit.
+    modifyView(
+        getDefaultView(vsum).withChangeRecordingTrait(),
+        (CommittableView v) -> {
+          var type = PrimitivetypesFactoryImpl.eINSTANCE.createContinuousType();
+          type.setName("ExampleContinuousType");
+          v.registerRoot(type,
+              URI.createFileURI(storageFolder + "/asem/type_ExampleContinuousType.asem"));
         });
   }
 
   private static VirtualModel createDefaultVirtualModel(Path storageFolder) throws IOException {
+    // Registers the correspondence metamodel before any existing correspondences are loaded from disk.
+    tools.vitruv.dsls.reactions.runtime.correspondence.CorrespondencePackage.eINSTANCE.eClass();
     Iterable<ChangePropagationSpecification> specs =
         List.of(
             new AmaltheaToAsemChangePropagationSpecification(),
             new AsemToAmaltheaChangePropagationSpecification());
     return new VirtualModelBuilder()
         .withStorageFolder(storageFolder)
-        .withUserInteractorForResultProvider(
-            new TestUserInteraction.ResultProvider(new TestUserInteraction()))
+        .withUserInteractorForResultProvider(new CliInteractionResultProviderImpl())
         .withChangePropagationSpecifications(specs)
         .buildAndInitialize();
   }

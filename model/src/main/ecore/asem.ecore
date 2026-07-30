@@ -14,6 +14,10 @@
     </eClassifiers>
     <eClassifiers xsi:type="ecore:EClass" name="TypedElement" eSuperTypes="#//base/Identifiable #//base/Named">
       <eStructuralFeatures xsi:type="ecore:EReference" name="type" eType="#//classifiers/Classifier"/>
+      <!-- changes made by uskui: begin -->
+      <eStructuralFeatures xsi:type="ecore:EAttribute" name="constant" unique="false"
+          eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EBoolean"/>
+      <!-- changes made by uskui: end -->
     </eClassifiers>
   </eSubpackages>
   <eSubpackages name="classifiers" nsURI="edu.kit.ipd.sdq.metamodels.asem.classifiers"
@@ -22,11 +26,12 @@
       <eStructuralFeatures xsi:type="ecore:EReference" name="methods" upperBound="-1"
           eType="#//dataexchange/Method" containment="true" resolveProxies="false"/>
     </eClassifiers>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="ComposedType" eSuperTypes="#//classifiers/Classifier">
       <eStructuralFeatures xsi:type="ecore:EReference" name="primitiveType" eType="#//primitivetypes/PrimitiveType"/>
+      <!-- changes made by uskui: begin -->
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="numberElements" unique="false"
           defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+      <!-- changes made by uskui: end -->
     </eClassifiers>
     <eClassifiers xsi:type="ecore:EClass" name="Component" abstract="true" eSuperTypes="#//base/Identifiable #//classifiers/Classifier #//base/Named">
       <eStructuralFeatures xsi:type="ecore:EReference" name="typedElements" upperBound="-1"
@@ -34,26 +39,22 @@
     </eClassifiers>
     <eClassifiers xsi:type="ecore:EClass" name="Class" eSuperTypes="#//classifiers/Component"/>
     <eClassifiers xsi:type="ecore:EClass" name="Module" eSuperTypes="#//classifiers/Component"/>
-    <!-- changes made by uskui -->
+    <!-- changes made by uskui: begin -->
     <eClassifiers xsi:type="ecore:EClass" name="Task" eSuperTypes="#//classifiers/Classifier">
       <eStructuralFeatures xsi:type="ecore:EReference" name="processes" upperBound="-1"
           eType="#//dataexchange/Method"/>
     </eClassifiers>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="InterruptTask" eSuperTypes="#//classifiers/Task"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="InitTask" eSuperTypes="#//classifiers/Task"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="SoftwareTask" eSuperTypes="#//classifiers/Task"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="PeriodicTask" eSuperTypes="#//classifiers/Task">
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="period" unique="false"
           defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="delay" unique="false"
           defaultValueLiteral="0" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
     </eClassifiers>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="TimeTableTask" eSuperTypes="#//classifiers/Task"/>
+    <!-- changes made by uskui: end -->
   </eSubpackages>
   <eSubpackages name="dataexchange" nsURI="edu.kit.ipd.sdq.metamodels.asem.dataexchange"
       nsPrefix="dataexchange">
@@ -86,14 +87,12 @@
     <eClassifiers xsi:type="ecore:EClass" name="Constant" eSuperTypes="#//base/TypedElement">
       <eStructuralFeatures xsi:type="ecore:EAttribute" name="value" eType="ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString"/>
     </eClassifiers>
-    <!-- changes made by uskui -->
+    <!-- changes made by uskui: begin -->
     <eClassifiers xsi:type="ecore:EClass" name="SystemConstant" eSuperTypes="#//dataexchange/Constant"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="Argument" eSuperTypes="#//dataexchange/Variable"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="Input" eSuperTypes="#//dataexchange/Variable"/>
-    <!-- changes made by uskui -->
     <eClassifiers xsi:type="ecore:EClass" name="Output" eSuperTypes="#//dataexchange/Variable"/>
+    <!-- changes made by uskui: end -->
   </eSubpackages>
   <eSubpackages name="primitivetypes" nsURI="edu.kit.ipd.sdq.metamodels.asem.primitivetypes"
       nsPrefix="primitivetypes">

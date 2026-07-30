@@ -1,14 +1,15 @@
 import "http://app4mc.eclipse.org/amalthea/3.3.0" as am
 import "edu.kit.ipd.sdq.metamodels.asem" as asem
+import "edu.kit.ipd.sdq.metamodels.asem.base" as asem_b
 import "edu.kit.ipd.sdq.metamodels.asem.classifiers" as asem_c
 import "edu.kit.ipd.sdq.metamodels.asem.dataexchange" as asem_d
 import "edu.kit.ipd.sdq.metamodels.asem.primitivetypes" as asem_p
 
 // Change propagation: ASEM (KIT) --> AMALTHEA (APP4MC 3.3.0)
-// Existence rules  : E3, E4, E7, E8, E12, E13, E14, E15, E16, E17,
-//                    E22, E23, E24, E25, E26, E27, E28, E29, E30, E31, E32
-// Property rules   : P2, P4, P6, P7, P12, P15, P16, P17
-// Structural rules : S3, S4, S7, S8 (absorbed into E7/E12/E13 — see SECTION 2/3)
+// Existence rules  : E3, E4, E7, E8, E12, E13, E22, E23, E24, E25, E26, E27,
+//                    E28, E29, E30, E31, E32, E34
+// Property rules   : P2, P4, P6, P7, P8, P9, P12, P15, P16, P17
+// Structural rules : S3, S4, S7, S8 (absorbed into E7/E12/E13 — see SECTION 2/3), S10
 // See README.md §3.4 for the full rule table this maps onto.
 // Correspondences are NOT created here — looked up from amaltheaToAsem.
 
@@ -38,9 +39,6 @@ routine createComponentForModule(asem_c::Module module) {
     }
     update {
         component.name = module.name
-        // No correspondence exists from Module to the Amalthea root's ComponentsModel,
-        // so the Component is persisted as its own resource root (anchored to the
-        // already-persisted Module) — mirroring the Module-side fix in AmaltheaToAsem.reactions.
         persistProjectRelative(module, component, "amalthea/component_" + module.name + ".amxmi")
         addCorrespondenceBetween(module, component)
     }
@@ -79,9 +77,6 @@ routine syncModuleNameToComponent(asem_c::Module module) {
 
 
 // SECTION 2 — Method ↔ Runnable   (Rule 4 / E7, E8, P4)
-// Only Methods satisfying the Rule 4 OCL invariants trigger a Runnable:
-//   returnType must be null
-//   parameters list must be empty
 
 // E7 — void no-param Method created → create a Runnable
 reaction VoidMethodCreated {
@@ -101,11 +96,6 @@ routine createRunnableForMethod(asem_d::Method method) {
     }
     update {
         runnable.name = method.name
-        // Runnable's only EMF containment parent is SWModel, which this standalone,
-        // persistProjectRelative-anchored Component has no path to (see createComponentForModule
-        // above) — persist Runnable as its own resource root too, anchored to the
-        // already-persisted Method, then attach it via Component's non-containment
-        // "runnables" reference for the semantic link.
         persistProjectRelative(method, runnable, "amalthea/runnable_" + method.name + ".amxmi")
         component.runnables += runnable
         addCorrespondenceBetween(method, runnable)
@@ -166,9 +156,6 @@ routine createLabelForMessage(asem_d::Message message) {
     update {
         label.name     = message.name
         label.constant = false
-        // See createRunnableForMethod above: Label's only EMF containment parent is
-        // SWModel, unreachable from this standalone Component — persist Label as its
-        // own resource root, anchored to the already-persisted Message.
         persistProjectRelative(message, label, "amalthea/label_" + message.name + ".amxmi")
         component.labels += label
         addCorrespondenceBetween(message, label)
@@ -192,9 +179,6 @@ routine createLabelForConstant(asem_d::Constant constant) {
     update {
         label.name     = constant.name
         label.constant = true
-        // See createRunnableForMethod above: Label's only EMF containment parent is
-        // SWModel, unreachable from this standalone Component — persist Label as its
-        // own resource root, anchored to the already-persisted Constant.
         persistProjectRelative(constant, label, "amalthea/label_" + constant.name + ".amxmi")
         component.labels += label
         addCorrespondenceBetween(constant, label)
@@ -232,7 +216,39 @@ routine syncConstantNameToLabel(asem_d::Constant constant) {
 }
 
 
-// Input created → create a non-constant Label
+// E34 — Message deleted -> delete the corresponding Label
+reaction MessageDeleted {
+    after element asem_d::Message deleted
+    call deleteLabelForMessage(affectedEObject)
+}
+
+routine deleteLabelForMessage(asem_d::Message message) {
+    match {
+        val label = retrieve am::Label corresponding to message
+    }
+    update {
+        removeObject(label)
+        removeCorrespondenceBetween(message, label)
+    }
+}
+
+// E34 — Constant deleted -> delete the corresponding Label
+reaction ConstantDeleted {
+    after element asem_d::Constant deleted
+    call deleteLabelForConstant(affectedEObject)
+}
+
+routine deleteLabelForConstant(asem_d::Constant constant) {
+    match {
+        val label = retrieve am::Label corresponding to constant
+    }
+    update {
+        removeObject(label)
+        removeCorrespondenceBetween(constant, label)
+    }
+}
+
+// E26 — Input created -> create a non-constant Label
 reaction InputCreated {
     after element asem_d::Input created
     call createLabelForInput(affectedEObject)
@@ -255,7 +271,7 @@ routine createLabelForInput(asem_d::Input input) {
     }
 }
 
-// Output created → create a non-constant Label
+// E27 — Output created -> create a non-constant Label
 reaction OutputCreated {
     after element asem_d::Output created
     call createLabelForOutput(affectedEObject)
@@ -278,7 +294,7 @@ routine createLabelForOutput(asem_d::Output output) {
     }
 }
 
-// SystemConstant created → create a constant Label
+// E28 — SystemConstant created -> create a constant Label
 reaction SystemConstantCreated {
     after element asem_d::SystemConstant created
     call createLabelForSystemConstant(affectedEObject)
@@ -301,7 +317,7 @@ routine createLabelForSystemConstant(asem_d::SystemConstant systemConstant) {
     }
 }
 
-// Input.name changed → update Label.name
+// P17 — Input.name changed -> update Label.name
 reaction InputRenamed {
     after attribute replaced at asem_d::Input[name]
     call syncInputNameToLabel(affectedEObject)
@@ -316,7 +332,7 @@ routine syncInputNameToLabel(asem_d::Input input) {
     }
 }
 
-// Output.name changed → update Label.name
+// P17 — Output.name changed -> update Label.name
 reaction OutputRenamed {
     after attribute replaced at asem_d::Output[name]
     call syncOutputNameToLabel(affectedEObject)
@@ -331,7 +347,7 @@ routine syncOutputNameToLabel(asem_d::Output output) {
     }
 }
 
-// SystemConstant.name changed → update Label.name
+// P17 — SystemConstant.name changed -> update Label.name
 reaction SystemConstantRenamed {
     after attribute replaced at asem_d::SystemConstant[name]
     call syncSystemConstantNameToLabel(affectedEObject)
@@ -346,15 +362,99 @@ routine syncSystemConstantNameToLabel(asem_d::SystemConstant systemConstant) {
     }
 }
 
+// E34 — Input deleted -> delete the corresponding Label
+reaction InputDeleted {
+    after element asem_d::Input deleted
+    call deleteLabelForInput(affectedEObject)
+}
 
-// SECTION 4 — PrimitiveType -> BaseTypeDefinition (Rules 7-9, reverse of E14-E16)
-//             ComposedType -> Array (Rule 10, reverse of E17)
+routine deleteLabelForInput(asem_d::Input input) {
+    match {
+        val label = retrieve am::Label corresponding to input
+    }
+    update {
+        removeObject(label)
+        removeCorrespondenceBetween(input, label)
+    }
+}
+
+// E34 — Output deleted -> delete the corresponding Label
+reaction OutputDeleted {
+    after element asem_d::Output deleted
+    call deleteLabelForOutput(affectedEObject)
+}
+
+routine deleteLabelForOutput(asem_d::Output output) {
+    match {
+        val label = retrieve am::Label corresponding to output
+    }
+    update {
+        removeObject(label)
+        removeCorrespondenceBetween(output, label)
+    }
+}
+
+// E34 — SystemConstant deleted -> delete the corresponding Label
+reaction SystemConstantDeleted {
+    after element asem_d::SystemConstant deleted
+    call deleteLabelForSystemConstant(affectedEObject)
+}
+
+routine deleteLabelForSystemConstant(asem_d::SystemConstant systemConstant) {
+    match {
+        val label = retrieve am::Label corresponding to systemConstant
+    }
+    update {
+        removeObject(label)
+        removeCorrespondenceBetween(systemConstant, label)
+    }
+}
+
+
+// P8, P9 — TypedElement.constant flipped on the ASEM side -> flip Label.constant
+reaction MessageConstantFlagChanged {
+    after attribute replaced at asem_d::Message[constant]
+    call syncConstantFlagToLabel(affectedEObject)
+}
+
+reaction InputConstantFlagChanged {
+    after attribute replaced at asem_d::Input[constant]
+    call syncConstantFlagToLabel(affectedEObject)
+}
+
+reaction OutputConstantFlagChanged {
+    after attribute replaced at asem_d::Output[constant]
+    call syncConstantFlagToLabel(affectedEObject)
+}
+
+reaction ConstantConstantFlagChanged {
+    after attribute replaced at asem_d::Constant[constant]
+    call syncConstantFlagToLabel(affectedEObject)
+}
+
+reaction SystemConstantConstantFlagChanged {
+    after attribute replaced at asem_d::SystemConstant[constant]
+    call syncConstantFlagToLabel(affectedEObject)
+}
+
+routine syncConstantFlagToLabel(asem_b::TypedElement typedElement) {
+    match {
+        val label = retrieve am::Label corresponding to typedElement
+    }
+    update {
+        label.constant = typedElement.constant
+    }
+}
+
+
+// SECTION 4 — PrimitiveType -> BaseTypeDefinition (Rules 7-9 / E29-E31)
+//             ComposedType -> Array (Rule 10 / E32)
 
 
 // P12 — Array.numberElements <-> ComposedType.numberElements
 
 
-// E14 reverse — BooleanType created -> BaseTypeDefinition (size=1 bit)
+// E29 — BooleanType created -> BaseTypeDefinition (size=1 bit)
 reaction BooleanTypeCreated {
     after element asem_p::BooleanType created
     call createBaseTypeForBoolean(affectedEObject)
@@ -378,7 +478,7 @@ routine createBaseTypeForBoolean(asem_p::BooleanType boolType) {
     }
 }
 
-// E15 reverse — UnsignedDiscreteType/SignedDiscreteType created -> BaseTypeDefinition (size=32 bit)
+// E30 — UnsignedDiscreteType created -> BaseTypeDefinition
 reaction UnsignedDiscreteTypeCreated {
     after element asem_p::UnsignedDiscreteType created
     call createBaseTypeForUnsignedDiscrete(affectedEObject)
@@ -395,9 +495,6 @@ routine createBaseTypeForUnsignedDiscrete(asem_p::UnsignedDiscreteType udType) {
     }
     update {
         btd.name = udType.name
-        // Genuinely ambiguous (8/16/32 are all real, different types) — ask rather than
-        // guess. Boolean (fixed at 1 bit by Rule 7's own OCL constraint) is NOT asked about,
-        // since there's no actual decision to make there.
         val String userMsg = "An UnsignedDiscreteType '" + udType.name + "' was created in ASEM. " +
             "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
         val String[] selections = #["8", "16", "32"]
@@ -411,8 +508,6 @@ routine createBaseTypeForUnsignedDiscrete(asem_p::UnsignedDiscreteType udType) {
         }
         size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
         btd.size = size
-        // "u" prefix keeps this consistent with the forward direction's own
-        // unsigned/signed discriminator at AmaltheaToAsem.reactions:400
         alias.target = "asem"
         alias.alias = "u" + udType.name
         btd.aliases += alias
@@ -421,6 +516,7 @@ routine createBaseTypeForUnsignedDiscrete(asem_p::UnsignedDiscreteType udType) {
     }
 }
 
+// E30 — SignedDiscreteType created -> BaseTypeDefinition
 reaction SignedDiscreteTypeCreated {
     after element asem_p::SignedDiscreteType created
     call createBaseTypeForSignedDiscrete(affectedEObject)
@@ -437,8 +533,6 @@ routine createBaseTypeForSignedDiscrete(asem_p::SignedDiscreteType sdType) {
     }
     update {
         btd.name = sdType.name
-        // Same reasoning as UnsignedDiscreteType above — 8/16/32 are all real, different
-        // types, genuinely ambiguous, so ask rather than guess.
         val String userMsg = "A SignedDiscreteType '" + sdType.name + "' was created in ASEM. " +
             "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
         val String[] selections = #["8", "16", "32"]
@@ -460,7 +554,7 @@ routine createBaseTypeForSignedDiscrete(asem_p::SignedDiscreteType sdType) {
     }
 }
 
-// E16 reverse — ContinuousType created -> BaseTypeDefinition (size=64 bit)
+// E31 — ContinuousType created -> BaseTypeDefinition
 reaction ContinuousTypeCreated {
     after element asem_p::ContinuousType created
     call createBaseTypeForContinuous(affectedEObject)
@@ -477,8 +571,6 @@ routine createBaseTypeForContinuous(asem_p::ContinuousType contType) {
     }
     update {
         btd.name = contType.name
-        // 32-bit (float) vs 64-bit (double) are genuinely different types with different
-        // precision, not one type with cosmetic variation — ask rather than guess.
         val String userMsg = "A ContinuousType '" + contType.name + "' was created in ASEM. " +
             "ASEM doesn't store a bit-width. Which size should the AMALTHEA type get?"
         val String[] selections = #["32", "64"]
@@ -491,8 +583,6 @@ routine createBaseTypeForContinuous(asem_p::ContinuousType contType) {
         }
         size.unit = org.eclipse.app4mc.amalthea.model.DataSizeUnit.BIT
         btd.size = size
-        // "double" keeps this consistent with the forward direction's own
-        // float/double discriminator at AmaltheaToAsem.reactions:414
         alias.target = "asem"
         alias.alias = "double" + contType.name
         btd.aliases += alias
@@ -501,7 +591,7 @@ routine createBaseTypeForContinuous(asem_p::ContinuousType contType) {
     }
 }
 
-// E17 reverse — ComposedType created -> Array
+// E32 — ComposedType created -> Array
 reaction ComposedTypeCreated {
     after element asem_c::ComposedType created
     call createArrayForComposedType(affectedEObject)
@@ -537,10 +627,10 @@ routine syncComposedTypeNumberElementsToArray(asem_c::ComposedType composedType)
 }
 
 
-// SECTION 5 — Task/InterruptTask ↔ Task/ISR   (Rules 2 & 3, reverse direction)
+// SECTION 5 — Task/InterruptTask ↔ Task/ISR   (Rules 2 & 3 / E22-E25)
 
 
-// ASEM Task created → create an AMALTHEA Task
+// E22 — ASEM Task created -> create an AMALTHEA Task
 reaction AsemTaskCreated {
     after element asem_c::Task created
     call createTaskForAsemTask(affectedEObject)
@@ -560,7 +650,7 @@ routine createTaskForAsemTask(asem_c::Task asemTask) {
     }
 }
 
-// ASEM InterruptTask created → create an AMALTHEA ISR
+// E24 — ASEM InterruptTask created -> create an AMALTHEA ISR
 reaction AsemInterruptTaskCreated {
     after element asem_c::InterruptTask created
     call createISRForInterruptTask(affectedEObject)
@@ -580,7 +670,7 @@ routine createISRForInterruptTask(asem_c::InterruptTask interruptTask) {
     }
 }
 
-// ASEM Task deleted → delete corresponding AMALTHEA Task
+// E23 — ASEM Task deleted -> delete corresponding AMALTHEA Task
 reaction AsemTaskDeleted {
     after element asem_c::Task deleted
     call deleteTaskForAsemTask(affectedEObject)
@@ -596,7 +686,7 @@ routine deleteTaskForAsemTask(asem_c::Task asemTask) {
     }
 }
 
-// ASEM InterruptTask deleted → delete corresponding AMALTHEA ISR
+// E25 — ASEM InterruptTask deleted -> delete corresponding AMALTHEA ISR
 reaction AsemInterruptTaskDeleted {
     after element asem_c::InterruptTask deleted
     call deleteISRForInterruptTask(affectedEObject)
@@ -612,7 +702,7 @@ routine deleteISRForInterruptTask(asem_c::InterruptTask interruptTask) {
     }
 }
 
-// ASEM Task.name changed → update AMALTHEA Task.name
+// P15 — ASEM Task.name changed -> update AMALTHEA Task.name
 reaction AsemTaskRenamed {
     after attribute replaced at asem_c::Task[name]
     call syncAsemTaskNameToTask(affectedEObject)
@@ -627,7 +717,7 @@ routine syncAsemTaskNameToTask(asem_c::Task asemTask) {
     }
 }
 
-// ASEM InterruptTask.name changed → update AMALTHEA ISR.name
+// P16 — ASEM InterruptTask.name changed -> update AMALTHEA ISR.name
 reaction AsemInterruptTaskRenamed {
     after attribute replaced at asem_c::InterruptTask[name]
     call syncInterruptTaskNameToISR(affectedEObject)
@@ -642,9 +732,8 @@ routine syncInterruptTaskNameToISR(asem_c::InterruptTask interruptTask) {
     }
 }
 
-// InitTask/SoftwareTask/PeriodicTask/TimeTableTask created directly on the ASEM side →
-// create a plain AMALTHEA Task (AMALTHEA has no subtype distinction).
-
+// E22 — InitTask/SoftwareTask/PeriodicTask/TimeTableTask created directly on the ASEM
+// side -> create a plain AMALTHEA Task
 reaction AsemInitTaskCreated {
     after element asem_c::InitTask created
     call createTaskForAsemTaskSubtype(affectedEObject)
@@ -679,6 +768,8 @@ routine createTaskForAsemTaskSubtype(asem_c::Task asemTask) {
     }
 }
 
+// E23 — InitTask/SoftwareTask/PeriodicTask/TimeTableTask deleted directly on the ASEM
+// side -> delete the AMALTHEA Task
 reaction AsemInitTaskDeleted {
     after element asem_c::InitTask deleted
     call deleteTaskForAsemTaskSubtype(affectedEObject)
@@ -709,6 +800,8 @@ routine deleteTaskForAsemTaskSubtype(asem_c::Task asemTask) {
     }
 }
 
+// P15 — InitTask/SoftwareTask/PeriodicTask/TimeTableTask renamed directly on the ASEM
+// side -> update AMALTHEA Task.name
 reaction AsemInitTaskRenamed {
     after attribute replaced at asem_c::InitTask[name]
     call syncAsemTaskSubtypeNameToTask(affectedEObject)
@@ -738,7 +831,7 @@ routine syncAsemTaskSubtypeNameToTask(asem_c::Task asemTask) {
     }
 }
 
-// PeriodicTask.period/delay -> PeriodicStimulus.recurrence/offset 
+// P18 — PeriodicTask.period changed -> PeriodicStimulus.recurrence updated (or created)
 reaction PeriodicTaskPeriodChanged {
     after attribute replaced at asem_c::PeriodicTask[period]
     call syncPeriodToAmalthea(affectedEObject)
@@ -748,15 +841,31 @@ routine syncPeriodToAmalthea(asem_c::PeriodicTask periodicTask) {
     match {
         val task = retrieve am::Task corresponding to periodicTask
     }
+    create {
+        val newStimulus = new am::PeriodicStimulus
+        val newRecurrence = new am::Time
+        val newOffset = new am::Time
+    }
     update {
         val stimulus = task.stimuli.filter(typeof(org.eclipse.app4mc.amalthea.model.PeriodicStimulus)).head
         if (stimulus !== null && stimulus.recurrence !== null) {
             stimulus.recurrence.value = java.math.BigInteger.valueOf(periodicTask.period)
             stimulus.recurrence.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+        } else {
+            // P18, P19 — no PeriodicStimulus exists yet; create and attach one.
+            newRecurrence.value = java.math.BigInteger.valueOf(periodicTask.period)
+            newRecurrence.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+            newOffset.value = java.math.BigInteger.valueOf(periodicTask.delay)
+            newOffset.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+            newStimulus.recurrence = newRecurrence
+            newStimulus.offset = newOffset
+            persistProjectRelative(periodicTask, newStimulus, "amalthea/stimulus_" + task.name + ".amxmi")
+            task.stimuli += newStimulus
         }
     }
 }
 
+// P19 — PeriodicTask.delay changed -> PeriodicStimulus.offset updated (or created)
 reaction PeriodicTaskDelayChanged {
     after attribute replaced at asem_c::PeriodicTask[delay]
     call syncDelayToAmalthea(affectedEObject)
@@ -766,11 +875,26 @@ routine syncDelayToAmalthea(asem_c::PeriodicTask periodicTask) {
     match {
         val task = retrieve am::Task corresponding to periodicTask
     }
+    create {
+        val newStimulus = new am::PeriodicStimulus
+        val newRecurrence = new am::Time
+        val newOffset = new am::Time
+    }
     update {
         val stimulus = task.stimuli.filter(typeof(org.eclipse.app4mc.amalthea.model.PeriodicStimulus)).head
         if (stimulus !== null && stimulus.offset !== null) {
             stimulus.offset.value = java.math.BigInteger.valueOf(periodicTask.delay)
             stimulus.offset.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+        } else {
+            // P18, P19 — no PeriodicStimulus exists yet; create and attach one.
+            newRecurrence.value = java.math.BigInteger.valueOf(periodicTask.period)
+            newRecurrence.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+            newOffset.value = java.math.BigInteger.valueOf(periodicTask.delay)
+            newOffset.unit = org.eclipse.app4mc.amalthea.model.TimeUnit.MS
+            newStimulus.recurrence = newRecurrence
+            newStimulus.offset = newOffset
+            persistProjectRelative(periodicTask, newStimulus, "amalthea/stimulus_" + task.name + ".amxmi")
+            task.stimuli += newStimulus
         }
     }
 }
