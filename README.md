@@ -218,7 +218,7 @@ The metamodel is organised into four sub-packages: `base`, `classifiers`, `datae
 | `name` | `EString` (inherited) | 0..1 | Inherited from `Named`. |
 | `id` | `EString` (inherited) | 1..1 | Inherited from `Identifiable`. |
 | `type` | `classifiers::Classifier` | 0..1 | Reference to the type classifier of this element. |
-| `constant` | `EBoolean` | 0..1 | Mirrors `Label.constant` for whichever concrete subclass (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) this element currently is — kept correct by every AMALTHEA-origin creation/swap routine, and used as the ASEM-origin trigger for P8/P9 (flipping it swaps the object and updates `Label.constant`). Not a second source of truth — always reflects the object's actual class. |
+| `constant` | `EBoolean` | 0..1 | Mirrors `Label.constant` for whichever concrete subclass (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) this element currently is kept correct by every AMALTHEA-origin creation/swap routine, and used as the ASEM-origin trigger for P8/P9 (flipping it swaps the object and updates `Label.constant`). It always reflects the object's actual class. |
 
 ### 2.4 Package: classifiers
 
@@ -502,11 +502,11 @@ Context amalthea::Label
 | `Label.dataType` | `Constant.type` / `SystemConstant.type` (see Rules 7–9) |
 
 > [!NOTE]
-> ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does. Treated as a documentation error rather than something to implement against; removed from this rule's target list.
+> ASEM's `Parameter` class is structurally a `Method`'s formal argument (`position`, `method` opposite reference) — it doesn't represent a stored constant value the way `Constant` does.
 >
-> `SystemConstant` is implemented as a real, separate ASEM class (confirmed with the supervisor, no longer a "may be" guess). The discriminator: a constant=true `Label` carrying a `Tag` whose `name` or `tagType` is `"systemConstant"` (AMALTHEA's existing generic `ITaggable` mechanism) becomes a `SystemConstant`; otherwise it stays a plain `Constant`. This convention was chosen because no AMALTHEA field cleanly signals "system" vs. "plain" constant on its own, and the thesis figure (Table 5.1's original source) that might define the intended rule wasn't available.
+> `SystemConstant` is implemented as a real, separate ASEM class. The discriminator: a constant=true `Label` carrying a `Tag` whose `name` or `tagType` is `"systemConstant"` (AMALTHEA's existing generic `ITaggable` mechanism) becomes a `SystemConstant`; otherwise it stays a plain `Constant`. This convention was chosen because no AMALTHEA field cleanly signals "system" vs. "plain" constant on its own.
 >
-> **P8/P9 are now bidirectional.** A new `constant: EBoolean` attribute on ASEM's `base::TypedElement` (the common supertype of `Variable` and `Constant`) mirrors `Label.constant` — it exists purely as a flip trigger, not a second source of truth: whichever concrete class (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) an object currently is, it also carries this flag set to the correct value for that class, kept in sync by every creation and swap routine on the AMALTHEA→ASEM side. Flipping it directly on an ASEM object (`AsemToAmalthea.reactions`, `MessageConstantFlagChanged`/`ConstantConstantFlagChanged`/etc.) updates the corresponding `Label.constant` and lets the *existing* `LabelFlippedToConstant`/`LabelFlippedToVariable` swap routines do the actual object replacement — no duplicated swap logic.
+>  A new `constant: EBoolean` attribute on ASEM's `base::TypedElement` (the common supertype of `Variable` and `Constant`) mirrors `Label.constant` — it exists purely as a flip trigger, whichever concrete class (`Message`/`Input`/`Output`/`Constant`/`SystemConstant`) an object currently is, it also carries this flag set to the correct value for that class, kept in sync by every creation and swap routine on the AMALTHEA→ASEM side. Flipping it directly on an ASEM object (`AsemToAmalthea.reactions`, `MessageConstantFlagChanged`/`ConstantConstantFlagChanged`/etc.) updates the corresponding `Label.constant` and lets the *existing* `LabelFlippedToConstant`/`LabelFlippedToVariable` swap routines do the actual object replacement — no duplicated swap logic.
 
 #### Rule 6 — Label (constant=false) ↔ Variable / Message / Argument / Input / Output
 
@@ -522,7 +522,7 @@ Context amalthea::Label
 | `Label.labelAccesses[].access` | discriminates the target: read-only → `Input`, write-only → `Output`, mixed or not-yet-known → `Message` |
 
 > [!NOTE]
-> `Argument` is added to the ASEM ecore but **not wired** to any Label reaction — it structurally corresponds to AMALTHEA's `CallArgument` (tied to `RunnableCall.arguments`, a value passed at a specific call site), not to `Label` (a general data element). Wiring it into these rules would model the wrong relationship; it needs its own design pass keyed off `CallArgument` instead.
+> `Argument` is added to the ASEM ecore but **not wired** to any Label reaction — it structurally corresponds to AMALTHEA's `CallArgument` (tied to `RunnableCall.arguments`, a value passed at a specific call site), not to `Label` (a general data element). It needs its own design pass keyed off `CallArgument` instead.
 >
 > The Input/Output split uses `Label.labelAccesses[].access` (`read`/`write`), an already-modeled AMALTHEA field. Since a `LabelAccess` is normally added *after* the `Label` it references, most Labels initially become `Message` at creation time and get retroactively swapped to `Input`/`Output` once a `LabelAccess` is added and the access pattern becomes unambiguous (read-only or write-only).
 
@@ -540,7 +540,7 @@ Context amalthea::BaseTypeDefinition
 | `BaseTypeDefinition.name` | `BooleanType.name` (e.g. `bool`, `boolean`) |
 
 > [!NOTE]
-> Reverse direction (ASEM `BooleanType` created → AMALTHEA `BaseTypeDefinition`): size is fixed at 1 bit, not asked for — the OCL constraint above pins it to exactly one valid value, so there's no real decision to make. Contrast with Rules 8/9 below, where the size is genuinely ambiguous and is asked for interactively.
+> Reverse direction (ASEM `BooleanType` created → AMALTHEA `BaseTypeDefinition`): size is fixed at 1 bit, the OCL constraint above pins it to exactly one valid value, so there's no real decision to make. Contrast with Rules 8/9 below, where the size is genuinely ambiguous and is asked for interactively.
 
 #### Rule 8 — BaseTypeDefinition (size∈{8,16,32}) ↔ UnsignedDiscreteType / SignedDiscreteType
 
@@ -576,9 +576,9 @@ Context amalthea::BaseTypeDefinition
 > Reverse direction (ASEM `ContinuousType` created → AMALTHEA `BaseTypeDefinition`): 32-bit (`float`) and 64-bit (`double`) are genuinely different types with different precision, not one type with cosmetic variation — asked for interactively, same as Rule 8, instead of defaulting to 64 and silently turning every `float` into a `double`.
 
 > [!NOTE]
-> Every `BaseTypeDefinition`'s `DataSize` is tagged back to its owner (`"dataSizeOwner"`, the same way used for Task priority in Rule 2) so a later `DataSize.value` change can find its way back without `eContainer`. The routine is idempotent by design (only tears down and rebuilds if the current ASEM type doesn't already match what the current size dispatches to) rather than trying to detect "is this really a later change" — the DSL fires `attribute replaced` identically for a genuine later change and for a value's very first assignment during initial object construction, so there's no reliable way to tell those apart from the event alone. See the comment above `resizeBaseType` in `AmaltheaToAsem.reactions` for the full story, including why an earlier version of this fix (without the idempotency check) broke previously-passing tests.
+> Every `BaseTypeDefinition`'s `DataSize` is tagged back to its owner (`"dataSizeOwner"`, the same way used for Task priority in Rule 2) so a later `DataSize.value` change can find its way back without `eContainer`. The routine is idempotent by design (only tears down and rebuilds if the current ASEM type doesn't already match what the current size dispatches to) rather than trying to detect "is this really a later change" — the DSL fires `attribute replaced` identically for a genuine later change and for a value's very first assignment during initial object construction, so there's no reliable way to tell those apart from the event alone. See the comment above `resizeBaseType` in `AmaltheaToAsem.reactions` for the full story.
 >
-> **Edge case worth knowing about:** the alias — not just the size — decides Discrete vs. Continuous , and a resize never touches the alias, only the size. So a Discrete-family type (no `float`/`double` alias) can never *become* Continuous purely by resizing into 32/64 — it resizes into "nothing matches" instead: the old type is correctly removed, but no replacement gets built, since neither Rule 8 (alias says not-float/double) nor Rule 9 (needs a float/double alias) applies.
+> **Edge case worth knowing about:** the alias , not just the size — decides Discrete vs. Continuous , and a resize never touches the alias, only the size. So a Discrete-family type (no `float`/`double` alias) can never *become* Continuous purely by resizing into 32/64 — it resizes into "nothing matches" instead: the old type is correctly removed, but no replacement gets built, since neither Rule 8 (alias says not-float/double) nor Rule 9 (needs a float/double alias) applies.
 
 #### Rule 10 — Array ↔ ComposedType
 
@@ -591,7 +591,7 @@ Context amalthea::BaseTypeDefinition
 
 
 > [!NOTE]
-> `ComposedType.numberElements` (`EInt`, added to `asem.ecore`) now implements P12 (see §3.4): the element count is copied on creation in both directions and kept in sync afterwards — changing `Array.numberElements` in AMALTHEA updates the corresponding `ComposedType`, and vice versa.
+> `ComposedType.numberElements` (`EInt`, added to `asem.ecore`) implements P12 (see §3.4): the element count is copied on creation in both directions and kept in sync afterwards — changing `Array.numberElements` in AMALTHEA updates the corresponding `ComposedType`, and vice versa.
 ### 3.3 OCL Invariant Summary
 
 ```ocl
@@ -686,17 +686,17 @@ Rules are grouped into four categories: **Existence (E)**, **Property (P)**, **S
 | P5 | `Label.name` changed | set the corresponding `Message`/`Constant`/`Input`/`Output`/`SystemConstant`'s `.name` = new name |
 | P6 | `Message.name` changed | set `Label.name` = new name |
 | P7 | `Constant.name` changed | set `Label.name` = new name |
-| P8 | `Label.constant` changed false → true | replace ASEM `Message`/`Input`/`Output` with `Constant` or `SystemConstant`; update correspondence — **implemented, both directions**: a new ASEM `TypedElement.constant` flag mirrors this, and flipping it on the ASEM side flips `Label.constant` and triggers the same swap logic (see NOTE below) |
-| P9 | `Label.constant` changed true → false | replace ASEM `Constant`/`SystemConstant` with `Message`/`Input`/`Output`; update correspondence — **implemented, both directions**, see P8 |
+| P8 | `Label.constant` changed false → true | replace ASEM `Message`/`Input`/`Output` with `Constant` or `SystemConstant`; update correspondence : a new ASEM `TypedElement.constant` flag mirrors this, and flipping it on the ASEM side flips `Label.constant` and triggers the same swap logic (see NOTE below) |
+| P9 | `Label.constant` changed true → false | replace ASEM `Constant`/`SystemConstant` with `Message`/`Input`/`Output`; update correspondence : see P8 |
 | P10 | `Label.dataType` changed | update `Message.type` / `Constant.type` to corresponding ASEM `PrimitiveType` |
-| P11 🆕 | `BaseTypeDefinition.size` changed | replace ASEM `PrimitiveType` with type matching new size (re-apply Rules 7–9) — **implemented**, see NOTE on P11 above and in `AmaltheaToAsem.reactions` |
-| P12 🆕 | `Array.numberElements` changed | update `ComposedType.numberElements`, and vice versa — **implemented**, both directions |
+| P11 🆕 | `BaseTypeDefinition.size` changed | replace ASEM `PrimitiveType` with type matching new size (re-apply Rules 7–9) , see NOTE on P11 above and in `AmaltheaToAsem.reactions` |
+| P12 🆕 | `Array.numberElements` changed | update `ComposedType.numberElements`, and vice versa |
 | P13 | `Task.name` changed | set corresponding ASEM Task subtype's `.name` = new name |
 | P14 | `ISR.name` changed | set `InterruptTask.name` = new name |
 | P15 | ASEM Task subtype `.name` changed | set AMALTHEA `Task.name` = new name |
 | P16 | ASEM `InterruptTask.name` changed | set AMALTHEA `ISR.name` = new name |
 | P17 | ASEM `Input`/`Output`/`SystemConstant` `.name` changed | set corresponding `Label.name` = new name |
-| P18 🆕 | `PeriodicTask.period` changed | update `PeriodicStimulus.recurrence` (milliseconds), auto-creating the `PeriodicStimulus` if none exists yet — **implemented, both directions**, see NOTE on Rule 2 above |
+| P18 🆕 | `PeriodicTask.period` changed | update `PeriodicStimulus.recurrence` (milliseconds), auto-creating the `PeriodicStimulus` if none exists yet , see NOTE on Rule 2 above |
 | P19 🆕 | `PeriodicTask.delay` changed | update `PeriodicStimulus.offset` (milliseconds), auto-creating the `PeriodicStimulus` if none exists yet — **implemented, both directions**, see NOTE on Rule 2 above |
 
 #### Structural Rules — containment and reference changes
@@ -763,7 +763,7 @@ mvn clean verify -pl <module-name> -am
 
 `mvn clean verify` runs the automated test suite, which answers every interactive dialog (Task subtype, primitive-type bit size) with a pre-scripted value — no human is ever prompted. To actually be prompted and answer for real, run `VSUMExample`'s `main()` method directly.
 
-`vsum/sample-data/` is not committed (it's generated, machine-specific data — see the note below), so the first time you do this, build it locally:
+`vsum/sample-data/` holds generated, machine-specific data, so the first time you do this, build it locally:
 
 ```bash
 mvn -pl vsum org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass="tools.vitruv.methodologisttemplate.vsum.VSUMSampleDataGenerator" -Dexec.classpathScope=compile
@@ -785,5 +785,3 @@ Run both from the project root, and from a real terminal — `System.console()` 
 
 Re-running `VSUMExample` repeatedly against the same `vsum/sample-data/` folder adds another same-named `Task`/type each time, since the object names in the demo are hardcoded. Re-running `VSUMSampleDataGenerator` against an already-populated folder will similarly conflict — only run it once, right after generating a fresh copy is needed.
 
-> [!NOTE]
-> `vsum/sample-data/` is excluded from git because Vitruv bakes the *absolute filesystem path* of the storage folder into its internal bookkeeping (`vsum/models.models`, `vsum/uuid.uuid`) — a copy generated on one machine will not load correctly on another. `VSUMSampleDataGenerator` is the portable, committed "recipe"; run it locally to get a working copy tied to your own checkout.
