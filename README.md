@@ -10,6 +10,7 @@ A Maven project implementing bidirectional change propagation between the AMALTH
 - [2. ASEM Metamodel Description](#2-asem-metamodel-description)
 - [3. Semantic Overlaps and Consistency Preservation Rules](#3-semantic-overlaps-and-consistency-preservation-rules)
 - [4. Building and Running](#4-building-and-running)
+- [License](#license)
 
 ---
 
@@ -784,4 +785,10 @@ Run both from the project root, and from a real terminal — `System.console()` 
 4. ContinuousType bit size — E31
 
 Re-running `VSUMExample` repeatedly against the same `vsum/sample-data/` folder adds another same-named `Task`/type each time, since the object names in the demo are hardcoded. Re-running `VSUMSampleDataGenerator` against an already-populated folder will similarly conflict — only run it once, right after generating a fresh copy is needed.
+
+---
+
+## License
+
+This project is licensed under the [Eclipse Public License 1.0](LICENSE), the same license used by the Vitruv framework it builds on.
 
